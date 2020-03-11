@@ -2,7 +2,7 @@
 
 ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows parallel Monte Carlo simulation of soft & hard continuous-polydisperse particles on CPUs.  
 
-Files that come in this template:
+Files that come with this plugin:
  - CMakeLists.txt   : main CMake configuration file for the plugin
  - FindHOOMD.cmake  : script to find a HOOMD-Blue installation to link against
  - README.md           : This file

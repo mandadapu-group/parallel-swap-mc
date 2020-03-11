@@ -1,4 +1,4 @@
-set(COMPONENT_NAME hpmc_swap_plugin)
+set(COMPONENT_NAME swapmc)
 
 # find and configure LLVM
 find_package(LLVM REQUIRED CONFIG)
