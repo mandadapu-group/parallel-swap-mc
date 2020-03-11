@@ -1,3 +1,5 @@
+# HOOMD-MCSwap
+
 Files that come in this template:
  - CMakeLists.txt   : main CMake configuration file for the plugin
  - FindHOOMD.cmake  : script to find a HOOMD-Blue installation to link against
