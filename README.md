@@ -1,4 +1,4 @@
-# HOOMD-MCSwap
+# ParallelSwapMC
 
 Files that come in this template:
  - CMakeLists.txt   : main CMake configuration file for the plugin
