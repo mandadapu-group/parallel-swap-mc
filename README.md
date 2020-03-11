@@ -13,13 +13,19 @@ Note that plugins can only be built against a hoomd build that has been installe
 installed via 'make install'. Plugins can only be built against hoomd when it is built as a shared library.
 
 $ mkdir build
+
 $ cd build
+
 $ cmake /path/to/hoomd-mc-swap/
+
 $ make -j4
+
 $ make install
 
 If hoomd is not in your PATH, you can specify the root using
+
 $ cmake /path/to/hoomd-mc-swap -DHOOMD_ROOT=/path/to/hoomd
+
 where ${HOOMD_ROOT}/bin/hoomd is where the hoomd executable is installed
 
 By default, 'make install' will install the plugin into
@@ -29,8 +35,10 @@ And thus, the plugin loads like any other moduls within hoomd (such as hoomd.md 
 If hoomd is installed in a system directory (such as via an rpm or deb package), then you can still use plugins.
 Delete the 'build' and start over. Set the environment variable HOOMD_PLUGINS_DIR in your .bash_profile
  - export HOOMD_PLUGINS_DIR=${HOME}/hoomd_plugins  # as an example
+
 When running cmake, add -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR} to the options
  - cmake /path/to/plugin_template_cpp -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR}
+
 Now, 'make install' will install the plugins into ${HOOMD_PLUGINS_DIR} and hoomd, when launched, will look there
 for the plugins.
 
