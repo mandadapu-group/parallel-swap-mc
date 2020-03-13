@@ -86,44 +86,41 @@ $ cd build
 $ cmake ../ -DENABLE_MPI=ON
 ```
 
-In this step, CMake will try to find the usual required packages (including LLVM). However, it will also try to find a HOOMD installation. If all goes well, then you should see (as part of cmake's output) the following lines:
+In this step, CMake will try to find the usual required packages (including LLVM). However, it will also try to find a HOOMD installation. Check your CMake output! Suppose that I'm installing the plugin in my personal workstation, where my username is 'yourusername' and the Python environment was set by Conda. If all goes well, then you should see (as part of cmake's output) the following lines:
 ```console
--- Python output: /home/muhammad/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
--- Looking for a HOOMD installation at /home/muhammad/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
--- Found hoomd installation at /home/muhammad/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
--- Found HOOMD include directory: /home/muhammad/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd/include
--- Found PythonLibs: /home/muhammad/anaconda3/envs/hoomd/lib/libpython3.7m.so
+-- Python output: /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
+-- Looking for a HOOMD installation at /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
+-- Found hoomd installation at /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
+-- Found HOOMD include directory: /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd/include
+-- Found PythonLibs: /home/yourusername/anaconda3/envs/hoomd/lib/libpython3.7m.so
 ```
 
-Note that plugins can only be built against a hoomd build that has been installed via a package or compiled and then
-installed via 'make install'. Plugins can only be built against hoomd when it is built as a shared library.
+If not, then first delete the contents of your build folder, then re-run cmake with the following build option:
+```
+$ cmake ../ -DHOOMD_ROOT=/path/to/hoomd
+```
+where ${HOOMD_ROOT}/bin/hoomd is where the hoomd executable is installed. In the example above /path/to/hoomd is /home/yourusername/anaconda3/envs/hoomd/. 
 
-$ mkdir build
+---
+**NOTE**
 
-$ cd build
+If hoomd is installed in a system directory (such as via an rpm or deb package), then you can still use plugins. This is not applicable if you follow the instructions we just followed in section **Installning HOOMD with JIT**. For completion, we will also provide instructions for this case. 
 
-$ cmake /path/to/hoomd-mc-swap/
+First, Delete the contents of your build folder. Set the environment variable HOOMD_PLUGINS_DIR inyour .bash_profile or .bashrc:
+```console
+export HOOMD_PLUGINS_DIR=${HOME}/hoomd_plugins  # as an example
+```
+When running cmake, you will add -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR} to the options. Go back to your build folder now, and run:
+```console
+$ cmake ../ -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR}
+```
+---
 
-$ make -j4
+Next, you would compile and install the plugin:
+```console
+$ make -j4 install
+```
 
-$ make install
-
-If hoomd is not in your PATH, you can specify the root using
-
-$ cmake /path/to/hoomd-mc-swap -DHOOMD_ROOT=/path/to/hoomd
-
-where ${HOOMD_ROOT}/bin/hoomd is where the hoomd executable is installed
-
-By default, 'make install' will install the plugin into
-${HOOMD_ROOT}
-And thus, the plugin loads like any other moduls within hoomd (such as hoomd.md and hoomd.hpmc) 
-
-If hoomd is installed in a system directory (such as via an rpm or deb package), then you can still use plugins.
-Delete the 'build' and start over. Set the environment variable HOOMD_PLUGINS_DIR in your .bash_profile
- - export HOOMD_PLUGINS_DIR=${HOME}/hoomd_plugins  # as an example
-
-When running cmake, add -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR} to the options
- - cmake /path/to/plugin_template_cpp -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR}
 
 Now, 'make install' will install the plugins into ${HOOMD_PLUGINS_DIR} and hoomd, when launched, will look there
 for the plugins.
