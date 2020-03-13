@@ -10,9 +10,16 @@ Files that come with this plugin:
  - README.md        : This file
  - swapmc           : Directory containing C++ and Python source codes that interacts with HOOMD-Blue
 
+## **What's Different with ParallelSwapMC from HOOMD-Blue's HPMC?**
+
 ## **Installation Instructions**
 
-The following instructions were modified from the example plugin provided by HOOMD-Blue. See https://hoomd-blue.readthedocs.io/en/stable/developer.html for other useful information:
+Parts of the instructions were modified from the example plugin provided by HOOMD-Blue. See https://hoomd-blue.readthedocs.io/en/stable/developer.html for other useful information:
+
+### **Please Read! Check Your HOOMD Installation**
+The requirements for installing the plugin is the same as standard HOOMD, except that you need the following package as REQUIRED:
+- [LLVM](https://llvm.org/) 5.0.0 <= x.0.0 <= 9.0.0
+
 
 ### **Please Read! Check Your HOOMD Installation**
 To compile this plugin, you (obviously) need to have HOOMD-Blue installed. However, this plugin depends very crucially on the JIT package, which is not always installed if you follow [the steps in HOOMD-Blue's website](https://hoomd-blue.readthedocs.io/en/stable/installation.html). Thus, successful installation of the plugin requires you to follow additional steps. To check if your HOOMD installation has the JIT package, just try to import it and see if Python gives an error:
@@ -30,8 +37,10 @@ ModuleNotFoundError: No module named 'hoomd.jit'
 If you see thie error, then you would need re-install HOOMD by compiling from source using the following set of instructions. See also the 'additional hints' section if you're trying to install HOOMD on clusters. 
 
 
-#### **Installing HOOMD with JIT**
- 
+### **Installing HOOMD with JIT**
+
+(If JIT is installed, then you don't need this step and skip directly to installing the plugin).
+
 The requirements for installing HOOMD with JIT is the same as standard HOOMD, except that you need the following package as REQUIRED:
 - [LLVM](https://llvm.org/) 5.0.0 <= x.0.0 <= 9.0.0
 
@@ -86,7 +95,9 @@ $ cd build
 $ cmake ../ -DENABLE_MPI=ON
 ```
 
-In this step, CMake will try to find the usual required packages (including LLVM). However, it will also try to find a HOOMD installation. Check your CMake output! Suppose that I'm installing the plugin in my personal workstation, where my username is 'yourusername' and the Python environment was set by Conda. If all goes well, then you should see (as part of cmake's output) the following lines:
+In this step, CMake will try to find the usual required packages (including LLVM). However, it will also try to find a HOOMD installation. Check your CMake output! 
+
+Here's a case example. Suppose that I'm installing the plugin in my personal workstation, where my username is 'yourusername' and the Python environment was Conda's 'base'. If all goes well, then I should see (as part of cmake's output) the following lines:
 ```console
 -- Python output: /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
 -- Looking for a HOOMD installation at /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
@@ -122,9 +133,12 @@ $ cmake ../ -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR}
 
 Now, 'make install' will install the plugins into ${HOOMD_PLUGINS_DIR} and hoomd, when launched, will look there
 for the plugins.
+
 ---
 
 
 ## **How to Use ParallelSwapMC**
 
-The plugin can now be used in any hoomd script.
+The plugin works like HOOMD-Blue's HPMC, but with more limited features. This means that **you should not import hoomd.hpmc to use the plugin**. 
+
+(More Instructions, coming soon . . .)
