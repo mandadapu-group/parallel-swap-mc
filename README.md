@@ -14,8 +14,22 @@ Files that come with this plugin:
 
 The following instructions were modified from the example plugin provided by HOOMD-Blue. See https://hoomd-blue.readthedocs.io/en/stable/developer.html for other useful information:
 
-### **Please Read! Note on HOOMD Installation**
-To compile this plugin, (obviously) you need to have HOOMD-Blue installed. However, successful installation of the plugin requires follow steps similar to those in compiling HOOMD-Blue. 
+### **Please Read! Check Your HOOMD Installation**
+To compile this plugin, (obviously) you need to have HOOMD-Blue installed. However, this plugin depends very crucially on the JIT package, which is not always installed if you follow the steps in HOOMD-Blue's website. Thus, successful installation of the plugin requires you to follow additional steps. To check if your HOOMD installation has the JIT package, just try to import it and see if Python gives an error:
+
+```python
+import hoomd.jit
+```
+
+If JIT is not installed, then you should obtain
+
+```python
+ModuleNotFoundError: No module named 'hoomd.bgowe'
+```
+
+If you installed HOOMD through Conda or Signularity/Docker images, then these instructions are for you. If you installed HOOMD by compiling directly from source, there's an additional step that you need to do.
+
+We will follow 
 
 
 ### **Installing Plugin**
