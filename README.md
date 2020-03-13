@@ -75,7 +75,7 @@ $ make install
 
 Now, you're ready to install ParallelSwapMC. The process is similar to installing HOOMD.  First, git clone the project:
 ```console
-git clone https://github.com/mandadapu-group/parallel-swap-mc
+$ git clone https://github.com/mandadapu-group/parallel-swap-mc
 ```
 
 Next, configure your build.
@@ -101,6 +101,11 @@ $ cmake ../ -DHOOMD_ROOT=/path/to/hoomd
 ```
 where ${HOOMD_ROOT}/bin/hoomd is where the hoomd executable is installed. In the example above /path/to/hoomd is /home/yourusername/anaconda3/envs/hoomd/. 
 
+Finally, you would compile and install the plugin:
+```console
+$ make -j4 install
+```
+
 ---
 **NOTE**
 
@@ -114,16 +119,11 @@ When running cmake, you will add -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR} to the
 ```console
 $ cmake ../ -DHOOMD_PLUGINS_DIR=${HOOMD_PLUGINS_DIR}
 ```
----
-
-Next, you would compile and install the plugin:
-```console
-$ make -j4 install
-```
-
 
 Now, 'make install' will install the plugins into ${HOOMD_PLUGINS_DIR} and hoomd, when launched, will look there
 for the plugins.
+---
+
 
 ## **How to Use ParallelSwapMC**
 
