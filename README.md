@@ -21,15 +21,22 @@ To compile this plugin, (obviously) you need to have HOOMD-Blue installed. Howev
 import hoomd.jit
 ```
 
-If JIT is not installed, then you need to re-install HOOMD by compiling from source using the following set of instructions. See also the 'additional hints' section if you're trying to install HOOMD on clusters. 
-
-
-#### **Installing HOOMD with JIT**
- 
+If JIT is not installed, then you need you would see the following error:
 
 ```python
 ModuleNotFoundError: No module named 'hoomd.bgowe'
 ```
+
+and re-install HOOMD by compiling from source using the following set of instructions. See also the 'additional hints' section if you're trying to install HOOMD on clusters. 
+
+
+#### **Installing HOOMD with JIT**
+ 
+The requirements for installing HOOMD with JIT is the same as standard HOOMD, except that you need the following package as REQUIRED:
+- [LLVM](https://llvm.org/) 5.0.0 <= x.0.0 <= 9.0.0
+
+Most clusters have LLVM as a module you can load. If not, then you can either ask a cluster administrator to install it on the cluster or [install LLVM yourself](https://releases.llvm.org/). At present, HOOMD with JIT can only be installed with any LLVM version above 5.0.0 **but below 9.0.0**. LLVM's Git repository has LLVM 10.0.0, **which will not work**. So please, be careful!
+
 
 If you installed HOOMD through Conda or Signularity/Docker images, then these instructions are for you. If you installed HOOMD by compiling directly from source, there's an additional step that you need to do.
 
