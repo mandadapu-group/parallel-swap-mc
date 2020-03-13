@@ -21,7 +21,11 @@ To compile this plugin, (obviously) you need to have HOOMD-Blue installed. Howev
 import hoomd.jit
 ```
 
-If JIT is not installed, then you should obtain
+If JIT is not installed, then you need to re-install HOOMD by compiling from source using the following set of instructions. See also the 'additional hints' section if you're trying to install HOOMD on clusters. 
+
+
+#### **Installing HOOMD with JIT**
+ 
 
 ```python
 ModuleNotFoundError: No module named 'hoomd.bgowe'
