@@ -42,7 +42,7 @@ If JIT is not installed, then you need you would see the following error:
 ModuleNotFoundError: No module named 'hoomd.jit'
 ```
 
-If you see thie error, then you would need re-install HOOMD by compiling from source using the following set of instructions. See also the 'additional hints' section if you're trying to install HOOMD on clusters. 
+If you see thie error, then you would need re-install HOOMD by compiling from source and with additional build options.  
 
 
 ### **Installing HOOMD with JIT**
@@ -114,7 +114,15 @@ Here's a case example. Suppose that I'm installing the plugin in my personal wor
 -- Found PythonLibs: /home/yourusername/anaconda3/envs/hoomd/lib/libpython3.7m.so
 ```
 
-If not, then first delete the contents of your build folder, then re-run cmake with the following build option:
+If not, then the following output could be found:
+```console
+CMake Error at FindHOOMD.cmake:46 (message):
+  Could not find hoomd installation, either set HOOMD_ROOT or set
+  PYTHON_EXECUTABLE to a python which can find hoomd
+Call Stack (most recent call first):
+  CMakeLists.txt:8 (include)
+```
+if the above message is what you found, then delete the contents of your build folder. Next, re-run cmake with the following build option:
 ```
 $ cmake ../ -DHOOMD_ROOT=/path/to/hoomd
 ```
