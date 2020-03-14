@@ -24,7 +24,7 @@ ParallelSwapMC, like HPMC, essentially acts as an independent Monte Carlo packag
 
 Parts of the instructions were modified from the example plugin provided by HOOMD-Blue. See https://hoomd-blue.readthedocs.io/en/stable/developer.html for other useful information:
 
-### **Please Read! Check Your HOOMD Installation**
+### **Requirements**
 The requirements for installing the plugin is the same as standard HOOMD, except that you need the following package as REQUIRED:
 - [LLVM](https://llvm.org/) 5.0.0 <= x.0.0 <= 9.0.0
 
