@@ -1,6 +1,6 @@
 # **ParallelSwapMC**
 
-ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows parallel Monte Carlo simulation of soft & hard continuous-polydisperse particles on CPUs. In particular, it adds moves which swap either the diameter or positions of the particles. The code is largely based on HOOMD-Blue's [Hard Particle Monte Carlo](https://hoomd-blue.readthedocs.io/en/stable/package-hpmc.html) (HPMC) and [Just-in-Time](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html) (JIT) package.
+ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows Monte Carlo simulation of soft & hard continuous-polydisperse particles on multi-CPUs. In particular, it adds moves which swap either the diameter or positions of the particles. The code is largely based on HOOMD-Blue's [Hard Particle Monte Carlo](https://hoomd-blue.readthedocs.io/en/stable/package-hpmc.html) (HPMC) and [Just-in-Time](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html) (JIT) package.
 
 The plugin is currently under *beta* stage.  
 
@@ -13,11 +13,11 @@ Files that come with this plugin:
  - swapmc           : Directory containing C++ and Python source codes that interacts with HOOMD-Blue
 
 ## **ParallelSwapMC vs. HOOMD-Blue's HPMC**
-ParallelSwapMC, like HPMC, essentially acts as an independent Monte Carlo package. In fact, you don't need to load HOOMD-Blue's HPMC to use ParallelSwapMC. However there are key differences that one should be **extremely aware of**:
+ParallelSwapMC, like HPMC, essentially acts as an independent Monte Carlo package. You don't need to load HOOMD-Blue's HPMC to use ParallelSwapMC. However, there are key differences that one should be **extremely aware of**:
 - *ParallelSwapMC only supports spherical particles:* this reflects the intended application of the plugin, which is to simulate poly-disperse spherical atoms/particles. 
-- *ParallelSwapMC only supports particles with hard repulsion or particles with soft interactions, but not both:* this is a feature that will be added in a future release.
-- *ParallelSwapMC does not particle multi-labelling:* unlike HPMC, all particles will be labelled the same way. Multi-component systems are introduced by changing specifying particle sizes directly.
-- *ParallelSwapMC does not have rotational moves:* all HPMC codes will have, by-default, command to output rotational moves or specify translational/rotational move ratio. This is eliminated in ParallelSwapMC
+- *ParallelSwapMC (at present) only supports particles with hard repulsion or particles with soft interactions, but not both:* this is a feature that will be added in a future release.
+- *ParallelSwapMC does not particle multi-labeling :* unlike HPMC, all particles will be labeled the same way. Multi-component systems are introduced by changing specifying particle sizes directly.
+- *ParallelSwapMC does not have rotational moves:* all HPMC codes will have, by default, command to output rotational moves or specify translational/rotational move ratio. This is eliminated in ParallelSwapMC
 - *ParallelSwapMC (at present) does not support external field, grand canonical ensemble, or cluster moves:* some of these features (cluster moves in particular) will be added in a future release.
 
 ## **Installation Instructions**
@@ -30,7 +30,7 @@ The requirements for installing the plugin is the same as standard HOOMD, except
 
 
 ### **Please Read! Check Your HOOMD Installation**
-To compile this plugin, you (obviously) need to have HOOMD-Blue installed. However, this plugin depends very crucially on the JIT package, which is not always installed if you follow [the steps in HOOMD-Blue's website](https://hoomd-blue.readthedocs.io/en/stable/installation.html). Thus, successful installation of the plugin requires you to follow additional steps. To check if your HOOMD installation has the JIT package, just try to import it and see if Python gives an error:
+To compile this plugin, you (obviously) need to have HOOMD-Blue installed. However, this plugin depends very crucially on the JIT package, which is not always installed if you follow [the steps in HOOMD-Blue's website](https://hoomd-blue.readthedocs.io/en/stable/installation.html). Thus, the successful installation of the plugin requires you to follow additional steps. To check if your HOOMD installation has the JIT package, just try to import it and see if Python gives an error:
 
 ```python
 import hoomd.jit
@@ -42,7 +42,7 @@ If JIT is not installed, then you need you would see the following error:
 ModuleNotFoundError: No module named 'hoomd.jit'
 ```
 
-If you see thie error, then you would need re-install HOOMD by compiling from source and with additional build options.  
+If you see this error, then you would need to re-install HOOMD by compiling from source and with additional build options.  
 
 
 ### **Installing HOOMD with JIT**
@@ -58,7 +58,7 @@ If you haven't done this already, clone HOOMD-Blue from Git:
 ```console
 $ git clone --recursive https://github.com/glotzerlab/hoomd-blue
 ```
-And yes, you do need need the --resursive option. Now, you need to configure with CMake. First create the build folder. It doesn't matter where, but we will choose the hoomd-blue directory that we've just cloned using Git:
+And yes, you do need the --recursive option. Now, you need to configure with CMake. First, create the build folder. It doesn't matter where, but we will choose the hoomd-blue directory that we've just cloned using Git:
 ```console
 $ cd hoomd-blue
 $ mkdir build
@@ -76,10 +76,10 @@ $ cmake ../ -DCMAKE_INSTALL_PREFIX=`python3 -c "import site; print(site.getsitep
 ```
 
 A couple of important notes:
-- Obviously, if you want to install to a different directory, just type a different directory -DCMAKE_INSTALL_PREFIX=/path/to/installdirectory
+- If you want to install to a different directory, just type a different directory -DCMAKE_INSTALL_PREFIX=/path/to/installdirectory
 - On HOOMD-Blue's installation page, the BUILD_JIT flag is not documented but, as of v2.9.0, this is still available as part of a valid build option. 
 
-Afterwards, you can compile:
+Afterward, you can compile:
 ```console
 $ make -j4
 ```
@@ -136,9 +136,9 @@ $ make -j4 install
 ---
 **NOTE**
 
-If hoomd is installed in a system directory (such as via an rpm or deb package), then you can still use plugins. This is not applicable if you follow the instructions we just followed in section **Installning HOOMD with JIT**. For completion, we will also provide instructions for this case. 
+If hoomd is installed in a system directory (such as via an rpm or deb package), then you can still use plugins. This is not applicable if you follow the instructions we just followed in section **Installing HOOMD with JIT**. For completion, we will also provide instructions for this case. 
 
-First, Delete the contents of your build folder. Set the environment variable HOOMD_PLUGINS_DIR inyour .bash_profile or .bashrc:
+First, Delete the contents of your build folder. Set the environment variable HOOMD_PLUGINS_DIR in your .bash_profile or .bashrc:
 ```console
 export HOOMD_PLUGINS_DIR=${HOME}/hoomd_plugins  # as an example
 ```
