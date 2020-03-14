@@ -2,7 +2,7 @@
 
 ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows Monte Carlo simulation of soft & hard continuous-polydisperse particles on multi-CPUs. In particular, it adds moves which swap either the diameter or positions of the particles. The code is largely based on HOOMD-Blue's [Hard Particle Monte Carlo](https://hoomd-blue.readthedocs.io/en/stable/package-hpmc.html) (HPMC) and [Just-in-Time](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html) (JIT) package.
 
-The plugin is currently under *beta* stage.  
+The plugin is currently under *beta* stage. For now, this file will be a temporary documentation for the plugin. 
 
 ## **Contents** 
 
@@ -105,13 +105,13 @@ $ cmake ../ -DENABLE_MPI=ON
 
 In this step, CMake will try to find the usual required packages (including LLVM). However, it will also try to find a HOOMD installation. Check your CMake output! 
 
-Here's a case example. Suppose that I'm installing the plugin in my personal workstation, where my username is 'yourusername' and the Python environment was Conda's 'base'. If all goes well, then I should see (as part of cmake's output) the following lines:
+Here's a case example. Suppose that I'm installing the plugin in my personal workstation, where my username is 'yourusername' and the Python environment was 'iluvbase'. If all goes well, then I should see (as part of cmake's output) the following lines:
 ```console
--- Python output: /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
--- Looking for a HOOMD installation at /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
--- Found hoomd installation at /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd
--- Found HOOMD include directory: /home/yourusername/anaconda3/envs/hoomd/lib/python3.7/site-packages/hoomd/include
--- Found PythonLibs: /home/yourusername/anaconda3/envs/hoomd/lib/libpython3.7m.so
+-- Python output: /home/yourusername/anaconda3/envs/iluvbase/lib/python3.7/site-packages/hoomd
+-- Looking for a HOOMD installation at /home/yourusername/anaconda3/envs/iluvbase/lib/python3.7/site-packages/hoomd
+-- Found hoomd installation at /home/yourusername/anaconda3/envs/iluvbase/lib/python3.7/site-packages/hoomd
+-- Found HOOMD include directory: /home/yourusername/anaconda3/envs/iluvbase/lib/python3.7/site-packages/hoomd/include
+-- Found PythonLibs: /home/yourusername/anaconda3/envs/iluvbase/lib/libpython3.7m.so
 ```
 
 If not, then the following output could be found:
@@ -153,9 +153,51 @@ for the plugins.
 ---
 
 
-## **How to Use ParallelSwapMC**
+## **Job Scripts with ParallelSwapMC**
 
-The plugin works like HOOMD-Blue's HPMC, but with more limited features. This means that **you should not import hoomd.hpmc to use the plugin**. 
+The plugin works like HOOMD-Blue's HPMC, but with more limited features (see section **ParallelSwapMC vs. HOOMD-Blue's HPMC**). This means that **you don't have to import hoomd.hpmc to use the plugin**. In fact, running a Monte Carlo simulation with ParallelSwapMC works (practically) the same way as HPMC. 
+
+Below is a sample Python Script to run a continous polydisperse particle system, whose particle size distribution is a uniform distribution: 
+```python
+import hoomd
+import hoomd.swapmc as swap
+import numpy as np
+from numpy.random import uniform, seed
+
+seed(0)
+hoomd.context.initialize("--mode=cpu --notice-level=2");
+
+#Initialize Our Own Configuration using a Snapshot
+rho = 1.00
+LParticles = 16;
+NParticles = LParticles**2
+dmax = 1.0
+dmin = 0.1
+
+Length = dmax*LParticles
+MyBox = hoomd.data.boxdim(L=Length, dimensions=2)
+snap = hoomd.data.make_snapshot(N=NParticles, box=MyBox, particle_types=['A'])
+snap.particles.types = ['A']
+
+def placePolydisperseOnSquare(snap):
+    for i in range(LParticles):
+        for j in range(LParticles):
+            snap.particles.position[i*LParticles+j,0] = Length*(i/LParticles-0.5)
+            snap.particles.position[i*LParticles+j,1] = Length*(j/LParticles-0.5)
+            snap.particles.position[i*LParticles+j,2] = 0
+            snap.particles.diameter[i*LParticles+j] = uniform(dmin,dmax)
+
+placePolydisperseOnSquare(snap)
+system = hoomd.init.read_snapshot(snap);
+
+#Set up the Monte Carlo 'integrator'
+mc = swap.integrate.sph_poly(d=0.2, seed=1,move_ratio=0.5,swap_mode='diameter',soft_mode='hard');
+mc.shape_param.set('A');
+boxMC = swap.update.boxmc(mc,betaP=20.0,seed=1)
+boxMC.volume(delta=0.76, weight=1.0)
+d = hoomd.dump.gsd("dump.gsd", period=100, group=hoomd.group.all(), dynamic=['attribute'],overwrite=True);
+hoomd.run(10000);
+```
 
 (More Instructions, coming soon . . .)
 
