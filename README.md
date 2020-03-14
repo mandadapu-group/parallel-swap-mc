@@ -52,7 +52,7 @@ If you see thie error, then you would need re-install HOOMD by compiling from so
 The requirements for installing HOOMD with JIT is the same as standard HOOMD, except that you need the following package as REQUIRED:
 - [LLVM](https://llvm.org/) 5.0.0 <= x.0.0 <= 9.0.0
 
-Most clusters have LLVM as a module you can load. If not, then you can either ask a cluster administrator to install it on the cluster or [install LLVM yourself](https://releases.llvm.org/). At present, HOOMD with JIT can only be installed with any LLVM version above 5.0.0 **but below 9.0.0**. LLVM's Git repository has LLVM 10.0.0, **which is not compatible with HOOMD-Blue (as of v2.9.0)**. So please, be careful!
+Most clusters have LLVM as a module you can load. If not, then you can either ask a cluster administrator to [install LLVM yourself](https://releases.llvm.org/). At present, HOOMD with JIT can only be installed with any LLVM version above 5.0.0 **but below 9.0.0**. LLVM's Git repository has LLVM 10.0.0, **which is not compatible with HOOMD-Blue (as of v2.9.0)**. So please, be careful!
 
 If you haven't done this already, clone HOOMD-Blue from Git:
 ```console
@@ -158,3 +158,7 @@ for the plugins.
 The plugin works like HOOMD-Blue's HPMC, but with more limited features. This means that **you should not import hoomd.hpmc to use the plugin**. 
 
 (More Instructions, coming soon . . .)
+
+## **Developer Notes**
+
+(More notes, coming soon . . .)
