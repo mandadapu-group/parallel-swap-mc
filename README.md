@@ -1,6 +1,8 @@
 # **ParallelSwapMC**
 
-ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows parallel Monte Carlo simulation of soft & hard continuous-polydisperse particles on CPUs. In particular, it adds moves which swap either the diameter or positions of the particles. The code is largely based on HOOMD-Blue's [Hard Particle Monte Carlo](https://hoomd-blue.readthedocs.io/en/stable/package-hpmc.html) (HPMC) and [Just-in-Time](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html) (JIT) package 
+ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows parallel Monte Carlo simulation of soft & hard continuous-polydisperse particles on CPUs. In particular, it adds moves which swap either the diameter or positions of the particles. The code is largely based on HOOMD-Blue's [Hard Particle Monte Carlo](https://hoomd-blue.readthedocs.io/en/stable/package-hpmc.html) (HPMC) and [Just-in-Time](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html) (JIT) package.
+
+The plugin is currently under *beta* stage.  
 
 ## **Contents** 
 
@@ -10,7 +12,13 @@ Files that come with this plugin:
  - README.md        : This file
  - swapmc           : Directory containing C++ and Python source codes that interacts with HOOMD-Blue
 
-## **What's Different with ParallelSwapMC from HOOMD-Blue's HPMC?**
+## **ParallelSwapMC vs. HOOMD-Blue's HPMC**
+ParallelSwapMC, like HPMC, essentially acts as an independent Monte Carlo package. In fact, you don't need to load HOOMD-Blue's HPMC to use ParallelSwapMC. However there are key differences that one should be **extremely aware of**:
+- *ParallelSwapMC only supports spherical particles:* this reflects the intended application of the plugin, which is to simulate poly-disperse spherical atoms/particles. 
+- *ParallelSwapMC only supports particles with hard repulsion or particles with soft interactions, but not both:* this is a feature that will be added in a future release.
+- *ParallelSwapMC does not particle multi-labelling:* unlike HPMC, all particles will be labelled the same way. Multi-component systems are introduced by changing specifying particle sizes directly.
+- *ParallelSwapMC does not have rotational moves:* all HPMC codes will have, by-default, command to output rotational moves or specify translational/rotational move ratio. This is eliminated in ParallelSwapMC
+- *ParallelSwapMC (at present) does not support external field, grand canonical ensemble, or cluster moves:* some of these features (cluster moves in particular) will be added in a future release.
 
 ## **Installation Instructions**
 
