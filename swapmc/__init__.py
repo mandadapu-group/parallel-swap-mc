@@ -95,9 +95,9 @@ will not require any modifications. **Maintainer:** Joshua A. Anderson
 """
 
 # need to import all submodules defined in this directory
-from hoomd.hpmc_swap_plugin import integrate
-from hoomd.hpmc_swap_plugin import patch
-from hoomd.hpmc_swap_plugin import update
+from hoomd.swapmc import integrate
+from hoomd.swapmc import patch
+from hoomd.swapmc import update
 #from hoomd.hpmc import update
 #from hoomd.hpmc import analyze
 #from hoomd.hpmc import compute

@@ -11,7 +11,7 @@ import subprocess
 import os
 
 import numpy as np
-from hoomd.hpmc_swap_plugin import _hpmc_swap_plugin as _plugin_patch
+from hoomd.swapmc import _swapmc as _plugin_patch
 #from hoomd.jit import patch
 
 #This python file faciltates the creation of relevant patch energies

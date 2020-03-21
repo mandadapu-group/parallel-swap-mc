@@ -4,7 +4,7 @@
 """ HPMC updaters.
 """
 
-from . import _hpmc_swap_plugin
+from . import _swapmc
 from . import integrate
 from hoomd.hpmc import integrate as hpmcintegrate
 #from . import compute
@@ -69,7 +69,7 @@ class boxmc(_updater):
         self.seed = int(seed)
 
         # create the c++ mirror class
-        self.cpp_updater = _hpmc_swap_plugin.UpdaterBoxMCSwap(hoomd.context.current.system_definition,
+        self.cpp_updater = _swapmc.UpdaterBoxMCSwap(hoomd.context.current.system_definition,
                                                mc.cpp_integrator,
                                                self.betaP.cpp_variant,
                                                1,

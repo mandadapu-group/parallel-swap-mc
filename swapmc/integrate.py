@@ -2,8 +2,8 @@
 # This file is part of the HOOMD-blue project, released under the BSD 3-Clause License.
 
 from hoomd import _hoomd
-from hoomd.hpmc_swap_plugin import _hpmc_swap_plugin
-from hoomd.hpmc_swap_plugin import data as datswap
+from hoomd.swapmc import _swapmc
+from hoomd.swapmc import data as datswap
 from hoomd.integrate import _integrator
 import numpy as np
 import hoomd
@@ -70,7 +70,7 @@ class sph_poly(hoomd.hpmc.integrate.mode_hpmc):
         #        else:
         #            self.cpp_integrator = _hpmc.IntegratorHPMCMonoImplicitSphere(hoomd.context.current.system_definition, seed, 1)
         #    else:
-        self.cpp_integrator = _hpmc_swap_plugin.IntegratorHPMCPolydisperseSwap(hoomd.context.current.system_definition, seed);
+        self.cpp_integrator = _swapmc.IntegratorHPMCPolydisperseSwap(hoomd.context.current.system_definition, seed);
         #else:
         #    cl_c = _hoomd.CellListGPU(hoomd.context.current.system_definition);
         #    hoomd.context.current.system.overwriteCompute(cl_c, "auto_cl2")

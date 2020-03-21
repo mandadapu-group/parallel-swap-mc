@@ -51,7 +51,7 @@ namespace detail
 using namespace hpmc::detail;
 
 //! Define the _hpmc python module exports
-PYBIND11_MODULE(_hpmc_swap_plugin, m)
+PYBIND11_MODULE(_swapmc, m)
     {
     export_IntegratorHPMCSwap(m);
     //export_IntegratorHPMCTest(m);

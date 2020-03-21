@@ -1,0 +1,8 @@
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/_swapmc.cpython-37m-x86_64-linux-gnu.so
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/lib_swapmc_llvm.so
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/data.py
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/__init__.py
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/_hpmc_swap.py
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/integrate.py
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/update.py
+/home/muhammad/anaconda3/lib/python3.7/site-packages/hoomd/swapmc/patch.py

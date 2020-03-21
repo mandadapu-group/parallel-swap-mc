@@ -6,16 +6,16 @@
 
 import hoomd
 import hoomd.hpmc.data
-from hoomd.hpmc_swap_plugin import _hpmc_swap_plugin
+from hoomd.swapmc import _swapmc
 import numpy
 
-class sph_poly_params(_hpmc_swap_plugin.sph_poly_param_proxy, hoomd.hpmc.data._param):
+class sph_poly_params(_swapmc.sph_poly_param_proxy, hoomd.hpmc.data._param):
     def __init__(self, mc, index):
         #Provide a check to make sure the indexing matches the initial tag??
-        _hpmc_swap_plugin.sph_poly_param_proxy.__init__(self, mc.cpp_integrator, index);
+        _swapmc.sph_poly_param_proxy.__init__(self, mc.cpp_integrator, index);
         hoomd.hpmc.data._param.__init__(self, mc, index);
         self._keys += ['max_radius', 'min_radius','orientable'];
-        self.make_fn = _hpmc_swap_plugin.make_sph_poly_params;
+        self.make_fn = _swapmc.make_sph_poly_params;
         
     def __str__(self):
         # should we put this in the c++ side?
