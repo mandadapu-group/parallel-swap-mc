@@ -31,10 +31,12 @@ void export_PatchEnergyJITCustom(pybind11::module &m)
     {
       pybind11::class_<hpmc::PatchEnergy, std::shared_ptr<hpmc::PatchEnergy> >(m, "PatchEnergy")
               .def(pybind11::init< >());
+    /*
     pybind11::class_<PatchEnergyJITCustom, std::shared_ptr<PatchEnergyJITCustom> >(m, "PatchEnergyJITCustom", pybind11::base< hpmc::PatchEnergy >())
             .def(pybind11::init< std::shared_ptr<ExecutionConfiguration>,
                                  const std::string&,
                                  Scalar >())
             .def("getScaledRCut", &PatchEnergyJITCustom::getScaledRCut)
             .def("energy", &PatchEnergyJITCustom::energy);
+    */
     }
