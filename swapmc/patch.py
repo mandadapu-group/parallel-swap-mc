@@ -479,6 +479,56 @@ float eval(const vec3<float>& r_ij,
         hoomd.util.print_status_line()
         self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
 
+class polydisperse12(object):
+    R''' Define the patch energy of a polydisperse soft-repulsive
+    '''
+    def __init__(self, mc, kT, scaledr_cut=1.25, v0=1.0, eps=0.2, model='polydisperse12', llvm_ir_file=None, clang_exec=None):
+        hoomd.util.print_status_line();
+
+        # check if initialization has occurred
+        if hoomd.context.exec_conf is None:
+            raise RuntimeError('Error creating Polydisperse12 patch energy, call context.initialize() first');
+
+        # raise an error if this run is on the GPU
+        if hoomd.context.exec_conf.isCUDAEnabled():
+            hoomd.context.msg.error("Patch energies are not supported on the GPU\n");
+            raise RuntimeError("Error initializing patch energy");
+
+        self.compute_name = "patch"
+        self.cpp_evaluator = _plugin_patch.PatchEnergyPolydisperse12(v0, eps, scaledr_cut, kT);
+        mc.set_PatchEnergyEvaluator(self);
+
+        self.mc = mc
+        self.enabled = True
+        self.log = False
+
+    R''' Disable the patch energy and optionally enable it only for logging
+
+    Args:
+        log (bool): If true, only use patch energy as a log quantity
+
+    '''
+    def disable(self,log=None):
+        hoomd.util.print_status_line();
+
+        if log:
+            # enable only for logging purposes
+            self.mc.cpp_integrator.disablePatchEnergyLogOnly(log)
+            self.log = True
+        else:
+            # disable completely
+            self.mc.cpp_integrator.setPatchEnergy(None);
+            self.log = False
+
+        self.enabled = False
+
+    R''' (Re-)Enable the patch energy
+
+    '''
+    def enable(self):
+        hoomd.util.print_status_line()
+        self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
+
 class ludovic(object):
     R''' Define the patch energy of a polydisperse soft-repulsive
     '''
