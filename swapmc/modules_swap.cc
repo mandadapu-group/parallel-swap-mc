@@ -5,7 +5,6 @@
 //#include <hoomd/hpmc/IntegratorHPMC.h>
 //#include <hoomd/hpmc/IntegratorHPMCMono.h>
 #include "PatchEnergyJITCustom.h"
-#include "PatchEnergyPolydisperse12.h"
 //#include "IntegratorHPMCMonoSwap.h"
 #include "IntegratorHPMCPolydisperse.h"
 //#include <hoomd/hpmc/UpdaterClusters.h>
@@ -61,7 +60,6 @@ PYBIND11_MODULE(_swapmc, m)
     export_sph_poly_params(m);
     //export_shapetest_params(m);
     export_PatchEnergyJITCustom(m);
-    export_PatchEnergyPolydisperse12(m);
 
     //export_point(m);
     export_sph_poly(m);
