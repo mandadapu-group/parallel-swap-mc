@@ -532,7 +532,7 @@ class polydisperse12(object):
 class polydisperse(object):
     R''' Define the patch energy of a polydisperse soft-repulsive
     '''
-    def __init__(self, mc, kT, scaledr_cut=1.25, v0=1.0, eps=0.2, model='polydisperse12', llvm_ir_file=None, clang_exec=None):
+    def __init__(self, mc, kT, scaledr_cut, v0, eps, model, llvm_ir_file=None, clang_exec=None):
         hoomd.util.print_status_line();
 
         if (model == "polydisperse12"):
