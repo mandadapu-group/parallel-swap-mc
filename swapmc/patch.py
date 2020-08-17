@@ -638,6 +638,7 @@ class polydisperse(object):
                                float c0   = {};
                                float c1   = {};
                                float c2   = {};
+                               float c3   = {};
                                float sigmasq = sigma*sigma;
                                float rsqinv = sigmasq / rsq;
                                float _rsq = rsq / sigmasq;
