@@ -622,7 +622,7 @@ class polydisperse(object):
                                return 0.0f;
                                }}
                           """.format(eps,scaledr_cut,v0/kT,c[0]/kT,c[1]/kT,c[2]/kT);
-        elif (model == "polydisperse18"):
+        elif (model == "polydisperse10"):
             a = scaledr_cut
             c0 =  -(56.0)*v0/(a**10);
             c1 =  (140.0)*v0/(a**12);
