@@ -15,7 +15,7 @@ from hoomd.swapmc import _swapmc as _plugin_patch
 #from hoomd.jit import patch
 
 #This python file faciltates the creation of relevant patch energies
-#we'll do shifted lennard jones and ludovic's system for now
+#we'll do shifted lennard jones and polydisperse's system for now
 #let's make different classes for different pair potentials. Of course, we'll let the user defined path energy to be available as well
 class lj(object):
     R''' Define the patch energy of a lennard jones particle.
@@ -529,7 +529,7 @@ class polydisperse12(object):
         hoomd.util.print_status_line()
         self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
 
-class ludovic(object):
+class polydisperse(object):
     R''' Define the patch energy of a polydisperse soft-repulsive
     '''
     def __init__(self, mc, kT, scaledr_cut=1.25, v0=1.0, eps=0.2, model='polydisperse12', llvm_ir_file=None, clang_exec=None):
@@ -622,6 +622,33 @@ class ludovic(object):
                                return 0.0f;
                                }}
                           """.format(eps,scaledr_cut,v0/kT,c[0]/kT,c[1]/kT,c[2]/kT);
+        elif (model == "polydisperse18"):
+            a = scaledr_cut
+            c0 =  -(56.0)*v0/(a**10);
+            c1 =  (140.0)*v0/(a**12);
+            c2 =  -(120.0)*v0/(a**14);
+            c3 =  (35.0)*v0/(a**16);
+            code = """
+                            float rsq = dot(r_ij, r_ij);
+                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
+                            float rcut  = {}*(sigma);
+                            if (rsq <= rcut*rcut)
+                               {{
+                               float v0   = {};
+                               float c0   = {};
+                               float c1   = {};
+                               float c2   = {};
+                               float sigmasq = sigma*sigma;
+                               float rsqinv = sigmasq / rsq;
+                               float _rsq = rsq / sigmasq;
+                               float r10inv = rsqinv*rsqinv*rsqinv*rsqinv*rsqinv;
+                               return v0*r10inv+c0+c1*_rsq+c2*_rsq*_rsq+c3*_rsq*_rsq*_rsq;
+                               }}
+                            else
+                               {{
+                               return 0.0f;
+                               }}
+                          """.format(eps,scaledr_cut,v0/kT,c0/kT,c1/kT,c2/kT,c3/kT);
         else:
             raise RuntimeError('Error creating Polydisperse patch energy. Not one of the available models. Perhaps theres a typo?');
 
