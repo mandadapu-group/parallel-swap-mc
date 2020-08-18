@@ -482,7 +482,7 @@ float eval(const vec3<float>& r_ij,
 class polydisperse(object):
     R''' Define the patch energy of a polydisperse soft-repulsive
     '''
-    def __init__(self, mc, kT, scaledr_cut, v0, eps, model, llvm_ir_file=None, clang_exec=None):
+    def __init__(self, mc, kT, scaledr_cut, v0, eps, model, llvm_ir_file=None, clang_exec=None,kappa=3.0):
         hoomd.util.print_status_line();
 
         if (model == "polydisperse12"):
@@ -600,6 +600,61 @@ class polydisperse(object):
                                return 0.0f;
                                }}
                           """.format(eps,scaledr_cut,v0/kT,c0/kT,c1/kT,c2/kT,c3/kT);
+        elif (model == "polydisperse106"):
+            a = scaledr_cut
+            c0 = (-21 + 10*a**4)*v0/a**10
+            c1 =  -((5*(-7 + 3*a**4)*v0)/a**12)
+            c2 = (3*(-5 + 2*a**4)*v0)/a**14
+            code = """
+                            float rsq = dot(r_ij, r_ij);
+                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
+                            float rcut  = {}*(sigma);
+                            if (rsq <= rcut*rcut)
+                               {{
+                               float v0   = {};
+                               float c0   = {};
+                               float c1   = {};
+                               float c2   = {};
+                               float sigmasq = sigma*sigma;
+                               float rsqinv = sigmasq / rsq;
+                               float _rsq = rsq / sigmasq;
+                               float r10inv = rsqinv*rsqinv*rsqinv*rsqinv*rsqinv;
+                               return v0*(r10inv-rsqinv*rsqinv*rsqinv)+c0+c1*_rsq + c2*_rsq*_rsq;
+                               }}
+                            else
+                               {{
+                               return 0.0f;
+                               }}
+                          """.format(eps,scaledr_cut,v0/kT,c0/kT,c1/kT,c2/kT);
+        elif (model == "polydisperseyukawa"):
+            a = scaledr_cut
+            c0 = -((np.exp(-kappa*a)*(15 + 7*kappa*a + kappa**2*a**2)*v0)/(8*a))
+            c1 = (np.exp(-kappa*a)*(5 + 5*kappa*a + kappa**2*a**2)*v0)/(4*a**3)
+            c2 = -((np.exp(-kappa*a)*(3 + 3*kappa*a + kappa**2*a**2)*v0)/(8*a**5))
+            code = """
+                            float rsq = dot(r_ij, r_ij);
+                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
+                            float rcut  = {}*(sigma);
+                            if (rsq <= rcut*rcut)
+                               {{
+                               float v0   = {};
+                               float kappa = {};
+                               float c0   = {};
+                               float c1   = {};
+                               float c2   = {};
+                               float sigmasq = sigma*sigma;
+                               float rsqinv = sigmasq / rsq;
+                               float rinv = sqrtf(esqinv);
+                               float _rsq = rsq / sigmasq;
+                               float _r = sqrtf(_rsq);
+                               float r10inv = rsqinv*rsqinv*rsqinv*rsqinv*rsqinv;
+                               return v0*exp(-_r*kappa)*rinv+c0+c1*_rsq + c2*_rsq*_rsq;
+                               }}
+                            else
+                               {{
+                               return 0.0f;
+                               }}
+                          """.format(eps,scaledr_cut,v0/kT,kappa,c0/kT,c1/kT,c2/kT);
         else:
             raise RuntimeError('Error creating Polydisperse patch energy. Not one of the available models. Perhaps theres a typo?');
 
