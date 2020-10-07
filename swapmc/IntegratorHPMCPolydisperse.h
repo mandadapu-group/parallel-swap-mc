@@ -522,8 +522,8 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
     }
     else if (!m_soft_mode && numofoverlaps != 0)
     {
-        m_exec_conf->msg->notice(2) << "There is an overlap at time: " << timestep << std::endl;
-        m_exec_conf->msg->notice(2) << "The number of detected overlaps is: " << numofoverlaps << std::endl;
+        m_exec_conf->msg->notice(0) << "There is an overlap at time: " << timestep << std::endl;
+        m_exec_conf->msg->notice(0) << "The number of detected overlaps is: " << numofoverlaps << std::endl;
         throw std::runtime_error("There should've been no overlaps. Was there error in initialization or bug? \n Remember that we're at hard shapes mode.");
     }
     #endif
@@ -708,6 +708,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                     
                     if (m_swap_mode)
                         {
+                            //Swap the diameters for trial move
                             diameter_swap = diameter_old;
                             diameter_i = diameter_swap_old;
                         }
@@ -741,6 +742,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
             
             OverlapReal maxdiameter = shape_i.getMaxCircumsphereDiameter();
             // subtract minimum AABB extent from search radius
+            //OverlapReal R_query = std::max(maxdiameter/OverlapReal(2.0),//diameter_i,//OverlapReal(2.0),
             OverlapReal R_query = std::max(maxdiameter/OverlapReal(2.0),//diameter_i,//OverlapReal(2.0),
                 r_cut_patch_ij-getMinCoreDiameter()/(OverlapReal)2.0);
             detail::AABB aabb_i_local = detail::AABB(vec3<Scalar>(0,0,0),R_query);
@@ -848,6 +850,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                         }
                         else
                         {
+                            //If the bounding box overlap with either particle i or particle swap we'll  check for particle overlaps
                             if (detail::overlap(m_aabb_tree.getNodeAABB(cur_node_idx), aabb) || detail::overlap(m_aabb_tree.getNodeAABB(cur_node_idx), aabbswap))
                                 {
                                 if (m_aabb_tree.isNodeLeaf(cur_node_idx))
@@ -880,7 +883,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                     }
                                                 else
                                                     {
-                                                    // If this is particle i and we are in an outside image, use the translated position and orientation
+                                                    // If this is particle swap and we are in an outside image, use the translated position and orientation
                                                     postype_j_swap = make_scalar4(pos_swap.x, pos_swap.y, pos_swap.z, postype_swap.w);
                                                     orientation_j_swap = quat_to_scalar4(shape_swap.orientation);
                                                     }
@@ -909,7 +912,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                     }
                                                 else
                                                     {
-                                                    // If this is particle i and we are in an outside image, use the translated position and orientation
+                                                    // If this is particle i and swap, and we are in an outside image, use the translated position and orientation
                                                         postype_j_swap = make_scalar4(pos_swap.x, pos_swap.y, pos_swap.z, postype_swap.w);
                                                         orientation_j_swap = quat_to_scalar4(shape_swap.orientation);
                                                         postype_j = make_scalar4(pos_i.x, pos_i.y, pos_i.z, postype_i.w);
@@ -919,21 +922,16 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                         
                                         // put particles in coordinate system of particle i
                                         vec3<Scalar> r_ij = vec3<Scalar>(postype_j) - pos_i_image;
+                                        // put particles in coordinate system of particle swap
                                         vec3<Scalar> r_ij_swap = vec3<Scalar>(postype_j_swap) - pos_swap_image;
 
                                         unsigned int typ_j = __scalar_as_int(postype_j.w);
                                         Shape shape_j(quat<Scalar>(orientation_j), m_params[typ_j]);
-                                        Scalar diameter_j = h_diameter.data[j];//shape_j.getCircumsphereDiameter(tag_j); 
-                                        //m_exec_conf->msg->notice(5) << "Is the error here (2) ? "  << std::endl;
-                                        //m_exec_conf->msg->notice(5) << "i_swap = "  << i_swap << std::endl;
-                                        //m_exec_conf->msg->notice(5) << "i = "  << i << std::endl;
-                                        //m_exec_conf->msg->notice(5) << "j = "  << j << std::endl;
-                                        //I GET IT!!!
+                                        Scalar diameter_j = h_diameter.data[j];
+                                        
                                         unsigned int typ_j_swap = __scalar_as_int(postype_j_swap.w);
                                         Shape shape_j_swap(quat<Scalar>(orientation_j_swap), m_params[typ_j_swap]);
-                                        Scalar diameter_j_swap = h_diameter.data[j];//shape_j_swap.getCircumsphereDiameter(tag_j); 
-                                        //unsigned int typ_j = __scalar_as_int(postype_j.w);
-                                        //Shape shape_j(quat<Scalar>(orientation_j), m_params[typ_j]);
+                                        Scalar diameter_j_swap = h_diameter.data[j];
 
                                         OverlapReal rcut = 0.0;
                                         OverlapReal rcut_swap = 0.0;
@@ -1329,22 +1327,11 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                             {
                                 counters.swap_accept_count++;
                             }
-                    
-
-                        /*
-                        if (m_swap_mode)
-                            {
-                            }
-                        */
-                        //Don't forget to reflect those changes to the actual particle data
-                        //m_exec_conf->msg->notice(2) << "Initially particle "<< i_swap << "has radius" << h_diameter.data[i_swap] << std::endl;//timestep << std::endl;
                         if (m_swap_mode)
                         {
+                            //Commit the changed diameter_swap and diameter_i to h_diameter!
                             h_diameter.data[i_swap] = diameter_swap;
-                            //m_exec_conf->msg->notice(2) << "Now particle "<< i_swap << "has radius" << h_diameter.data[i_swap] << std::endl;//timestep << std::endl;
-                            //m_exec_conf->msg->notice(2) << "Next, initially particle "<< i << "has radius" << h_diameter.data[i] << std::endl;//timestep << std::endl;
                             h_diameter.data[i] = diameter_i;
-                            //m_exec_conf->msg->notice(2) << "Now particle "<< i << "has radius" << h_diameter.data[i] << std::endl;//timestep << std::endl;
                         }
                         else
                         {
@@ -1479,7 +1466,7 @@ unsigned int IntegratorHPMCPolydisperse<Shape>::countOverlaps(unsigned int times
 
         // Check particle against AABB tree for neighbors
         //m_exec_conf->msg->notice(2) << "What is my diameter: " << diameter_i << std::endl;
-        detail::AABB aabb_i_local = shape_i.getAABB(vec3<Scalar>(0,0,0), OverlapReal(0.5)*diameter_i);
+        detail::AABB aabb_i_local = shape_i.getAABB(vec3<Scalar>(0,0,0), OverlapReal(0.5)*shape_i.getMaxCircumsphereDiameter());
 
         const unsigned int n_images = m_image_list.size();
         for (unsigned int cur_image = 0; cur_image < n_images; cur_image++)
@@ -1521,11 +1508,11 @@ unsigned int IntegratorHPMCPolydisperse<Shape>::countOverlaps(unsigned int times
                                 {
 
                                 #ifdef ENABLE_DEBUG
-                                m_exec_conf->msg->notice(6) << "Overlap between:  " << j << "and particle " << i << std::endl;
-                                m_exec_conf->msg->notice(6) << "Diameter_j: " << h_diameter.data[j] << "and particle " << h_diameter.data[i]<< std::endl;
+                                m_exec_conf->msg->notice(5) << "Overlap between:  " << j << "and particle " << i << std::endl;
+                                m_exec_conf->msg->notice(5) << "Diameter_j: " << h_diameter.data[j] << "and particle " << h_diameter.data[i]<< std::endl;
                                 vec3<OverlapReal> dr(r_ij);
                                 OverlapReal rsq = dot(dr,dr);
-                                m_exec_conf->msg->notice(6) << "r_ij squared: " << rsq << std::endl;
+                                m_exec_conf->msg->notice(5) << "r_ij squared: " << rsq << std::endl;
                                 #endif
                                 overlap_count++;
                                 if (early_exit)
@@ -1631,9 +1618,9 @@ float IntegratorHPMCPolydisperse<Shape>::computePatchEnergy(unsigned int timeste
 
         // the cut-off
         Scalar r_cut = 0;//m_patch->getRCut() + 0.5*m_patch->getAdditiveCutoff(typ_i);
-
+        Scalar maxdiameter = shape_i.getMaxCircumsphereDiameter();
         // subtract minimum AABB extent from search radius
-        OverlapReal R_query = std::max(OverlapReal(0.5)*d_i,
+        OverlapReal R_query = std::max(maxdiameter/OverlapReal(2.0),//diameter_i,//OverlapReal(2.0),
             r_cut-getMinCoreDiameter()/(OverlapReal)2.0);
         detail::AABB aabb_i_local = detail::AABB(vec3<Scalar>(0,0,0),R_query);
 
