@@ -190,8 +190,9 @@ placePolydisperseOnSquare(snap)
 system = hoomd.init.read_snapshot(snap);
 
 #Set up the Monte Carlo 'integrator'
-mc = swap.integrate.sph_poly(d=0.2, seed=1,move_ratio=0.5,swap_mode='diameter',soft_mode='hard');
+mc = swap.integrate.sph_poly(d=0.1, seed=1,swap_prob=0.15,swap_mode='diameter',soft_mode='hard');
 mc.shape_param.set('A');
+#Add box moves to run in NPT ensemble
 boxMC = swap.update.boxmc(mc,betaP=20.0,seed=1)
 boxMC.volume(delta=0.76, weight=1.0)
 d = hoomd.dump.gsd("dump.gsd", period=100, group=hoomd.group.all(), dynamic=['attribute'],overwrite=True);

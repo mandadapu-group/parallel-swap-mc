@@ -153,7 +153,7 @@ class IntegratorHPMCPolydisperse : public IntegratorHPMCSwap
         //! Set elements of the interaction matrix
         virtual void setOverlapChecks(unsigned int typi, unsigned int typj, bool check_overlaps);
 
-        /* No support for external fields yet
+        /* MH: The swap code has no support for external fields yet
         //! Set the external field for the integrator
         void setExternalField(std::shared_ptr< ExternalFieldMono<Shape> > external)
             {
@@ -220,6 +220,7 @@ class IntegratorHPMCPolydisperse : public IntegratorHPMCSwap
             }
 
         #ifdef ENABLE_MPI
+        
         //! Return the requested communication flags for ghost particles
         virtual CommFlags getCommFlags(unsigned int)
             {
@@ -362,19 +363,19 @@ class IntegratorHPMCPolydisperse : public IntegratorHPMCSwap
 
         //! callback so that the box change signal can invalidate the image list
         virtual void slotBoxChanged()
-            {
+        {
             m_image_list_valid = false;
             // changing the box does not necessarily invalidate the AABB tree - however, practically
             // anything that changes the box (i.e. NPT, box_resize) is also moving the particles,
             // so use it as a sign to rebuild the AABB tree
             m_aabb_tree_invalid = true;
-            }
+        }
 
         //! callback so that the particle sort signal can invalidate the AABB tree
         virtual void slotSorted()
-            {
+        {
             m_aabb_tree_invalid = true;
-            }
+        }
     };
 
 template <class Shape>
@@ -461,8 +462,9 @@ template <class Shape>
 void IntegratorHPMCPolydisperse<Shape>::printStats()
     {
     IntegratorHPMCSwap::printStats();
-
-    /*unsigned int max_height = 0;
+    
+    /* MH: I'll comment out the AABB tree stats printing for now.
+    unsigned int max_height = 0;
     unsigned int total_height = 0;
 
     for (unsigned int i = 0; i < m_pdata->getN(); i++)
@@ -507,12 +509,21 @@ void IntegratorHPMCPolydisperse<Shape>::slotNumTypesChange()
     updateCellWidth();
     }
 
+
+/* MH: 
+ * Performs n_select many Monte Carlo sweeps to the system. 
+ * This is the work-horse of the swap code and contains all necessarry routines to perform swap MC in parallel. 
+ * Important changes are applied from the original IntegratorHPMCMono.h to accomodate swap moves.  
+ */
 template <class Shape>
 void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
     {
     m_exec_conf->msg->notice(10) << "HPMCPolydisperse update: " << timestep << std::endl;
     IntegratorHPMCSwap::update(timestep);
 
+    /* If the plugin is compiled with debugging on, then prior to sweep, overlaps are always checked. This is important
+     * only when testing out the hard spheres problem
+     */
     #ifdef ENABLE_DEBUG
     int numofoverlaps = countOverlaps(timestep,false);
     m_exec_conf->msg->notice(5) << "Let's check for overlaps! Mode is" << std::boolalpha << m_soft_mode  << std::endl;
@@ -522,8 +533,8 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
     }
     else if (!m_soft_mode && numofoverlaps != 0)
     {
-        m_exec_conf->msg->notice(2) << "There is an overlap at time: " << timestep << std::endl;
-        m_exec_conf->msg->notice(2) << "The number of detected overlaps is: " << numofoverlaps << std::endl;
+        m_exec_conf->msg->notice(0) << "There is an overlap at time: " << timestep << std::endl;
+        m_exec_conf->msg->notice(0) << "The number of detected overlaps is: " << numofoverlaps << std::endl;
         throw std::runtime_error("There should've been no overlaps. Was there error in initialization or bug? \n Remember that we're at hard shapes mode.");
     }
     #endif
@@ -533,7 +544,8 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
     hpmc_counters_swap_t& counters = h_counters.data[0];
     const BoxDim& box = m_pdata->getBox();
     unsigned int ndim = this->m_sysdef->getNDimensions();
-    //This is to choose which particles to swap
+
+    // Saving the numver of active particles. This is nice to save when choosing which particles to swap later
     unsigned int nactive = m_pdata->getN();
 
     #ifdef ENABLE_MPI
@@ -587,6 +599,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
             vec3<Scalar> pos_i = vec3<Scalar>(postype_i);
             int typ_i = __scalar_as_int(postype_i.w);
             OverlapReal diameter_i = h_diameter.data[i];
+            
             // store read the current position and orientation as old position and orientation
             Shape shape_old(quat<Scalar>(orientation_i), m_params[typ_i]);
             Scalar4 postype_old = postype_i;
@@ -602,22 +615,18 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                 }
             #endif
 
-            /*// make a trial move for i
-            hoomd::RandomGenerator rng_i(hoomd::RNGIdentifier::HPMCMonoTrialMove, m_seed, i, m_exec_conf->getRank()*m_nselect + i_nselect, timestep);
-            unsigned int move_type_select = hoomd::UniformIntDistribution(0xffff)(rng_i);
-            bool move_type_translate = !shape_i.hasOrientation() || (move_type_select < m_move_ratio);
-            */
             // make a trial move for i, either translate or swap
             hoomd::RandomGenerator rng_i(hoomd::RNGIdentifier::HPMCMonoTrialMove, m_seed, i, m_exec_conf->getRank()*m_nselect + i_nselect, timestep);
             hoomd::UniformDistribution<Scalar> decide(0,1);
             Scalar move_type_select = decide(rng_i);
-            bool move_type_translate = (move_type_select < m_move_ratio);
+            bool move_type_translate = (move_type_select < m_move_prob);
             
             //By default, we let the index of the second (potentially swapped) particle to be the same as particle i 
             unsigned int swap_particle = cur_particle;
             unsigned int i_swap = m_update_order[swap_particle];
 
-            //Choose a second particle, if I'm doing swap moves. Or else. We use the default initialization which is the same as the first particle
+            //If I'm not doing translational moves, choose a second particle. 
+            //WHen not doing swap moves, we use the default initialization which is the same as the first particle i
             if (!move_type_translate)
                 {
                     hoomd::UniformIntDistribution uniform(nactive-2);
@@ -634,28 +643,27 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
             #ifdef ENABLE_MPI
             if (m_comm)
             {
-                // only move particle if active
+                // only swap this particle if it is active
                 if (!isActive(make_scalar3(postype_swap.x, postype_swap.y, postype_swap.z), box, ghost_fraction))
                     continue;
             }
             #endif
-            //whether I continue to swap or not, I should store its orientation, tag, position, and type
+
+            //whether I continue to swap or not, I should store its orientation, tag, position, type, and diameter
+            //These variables will be swapped later upon trial moves.
             Scalar4 orientation_swap = h_orientation.data[i_swap];
-            //unsigned int tag_swap = h_tag.data[i_swap];
             vec3<Scalar> pos_swap = vec3<Scalar>(postype_swap);
             int typ_swap = __scalar_as_int(postype_swap.w);
             OverlapReal diameter_swap = h_diameter.data[i_swap]; 
             
-            //Store the old shape object and old positions of the second particle
+            //Store also the old shape object and old positions of the second particle
             Scalar4 orientation_swap_old = h_orientation.data[i_swap];
             Scalar4 postype_swap_old = h_postype.data[i_swap];
             vec3<Scalar> pos_swap_old = pos_swap;
-            //unsigned int tag_swap_old = tag_swap;
-            //unsigned int i_swap_old = i_swap;
             Shape shape_swap_old(quat<Scalar>(orientation_swap_old), m_params[typ_swap]);
             OverlapReal diameter_swap_old = h_diameter.data[i_swap]; 
 
-
+            //Perform the trial move!
             if (move_type_translate)
                 {
                 // skip if no overlap check is required
@@ -679,7 +687,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                 }
             else
                 {
-                    // According to Ludovic's paper, you should also add an extra rejection criterion
+                    //According to Ninarello, et.al. PRX paper, you should also add an extra rejection criterion
                     //If the difference in diameter is not smaller than my dr_reject (meaning that it is actually bigger) then I immediately reject the particles
                     if (fabs(diameter_i-diameter_swap) > m_dr_reject) 
                         {
@@ -700,14 +708,16 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                     #ifdef ENABLE_MPI
                     if (m_comm)
                         {
-                        // check if either chosen particle is part of the active region or not
+                        // Check again if either chosen particle is part of the active region or not
                         if (!isActive(vec_to_scalar3(pos_i), box, ghost_fraction) || !isActive(vec_to_scalar3(pos_swap), box, ghost_fraction))
                              continue;
                         }
                     #endif
                     
+                    //Depending on the mode of swap, we could either swap the diameters or positions. 
                     if (m_swap_mode)
                         {
+                            //Swap the diameters for trial move
                             diameter_swap = diameter_old;
                             diameter_i = diameter_swap_old;
                         }
@@ -725,7 +735,8 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                     orientation_swap = orientation_i; 
                     orientation_i = orientation_swap_old;
                 }
-              
+            
+            //Save the shape object for particle i and its swap partner. 
             Shape shape_i(quat<Scalar>(orientation_i), m_params[typ_i]);
             Shape shape_swap(quat<Scalar>(orientation_swap), m_params[typ_swap]);
 
@@ -740,32 +751,35 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                 }
             
             OverlapReal maxdiameter = shape_i.getMaxCircumsphereDiameter();
-            // subtract minimum AABB extent from search radius
-            OverlapReal R_query = std::max(maxdiameter/OverlapReal(2.0),//diameter_i,//OverlapReal(2.0),
+            
+            // subtract minimum AABB extent from search radius for particle i
+            OverlapReal R_query = std::max(maxdiameter/OverlapReal(2.0),
                 r_cut_patch_ij-getMinCoreDiameter()/(OverlapReal)2.0);
             detail::AABB aabb_i_local = detail::AABB(vec3<Scalar>(0,0,0),R_query);
             
-            // subtract minimum AABB extent from search radius
-            R_query = std::max(maxdiameter/OverlapReal(2.0),//diameter_swap,//OverlapReal(2.0),
+            // subtract minimum AABB extent from search radius for swap particle
+            R_query = std::max(maxdiameter/OverlapReal(2.0),
                 r_cut_patch_i_swapj-getMinCoreDiameter()/(OverlapReal)2.0);
             detail::AABB aabb_swap_local = detail::AABB(vec3<Scalar>(0,0,0),R_query);
 
             // patch + field interaction deltaU
             double patch_field_energy_diff = 0;
 
-            // check for overlaps with neighboring particle's positions (also calculate the new energy)
+            // Check for overlaps with neighboring particle's positions if we have hard spheres but (also calculate the new energy)
+            // For loops go through images as well as nodes of the AABB tree.  
             // All image boxes (including the primary)
             const unsigned int n_images = m_image_list.size();
             for (unsigned int cur_image = 0; cur_image < n_images; cur_image++)
-                {
+            {
                     vec3<Scalar> pos_i_image = pos_i + m_image_list[cur_image];
                     detail::AABB aabb = aabb_i_local;
                     aabb.translate(pos_i_image);
 
-                    //I'll have to construct yet another aabb tree for the second particle (swappos)!
+                    //Construct yet another aabb tree for the second particle (swappos)!
                     vec3<Scalar> pos_swap_image = pos_swap + m_image_list[cur_image];
                     detail::AABB aabbswap = aabb_swap_local;
                     aabbswap.translate(pos_swap_image);
+                    
                     // stackless search
                     for (unsigned int cur_node_idx = 0; cur_node_idx < m_aabb_tree.getNumNodes(); cur_node_idx++)
                     {
@@ -848,12 +862,15 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                         }
                         else
                         {
+                            //If the bounding box of particle j overlaps with either particle i or particle swap we'll  check for particle overlaps
+                            //as well as computing the new energy, if there's soft interactions.
                             if (detail::overlap(m_aabb_tree.getNodeAABB(cur_node_idx), aabb) || detail::overlap(m_aabb_tree.getNodeAABB(cur_node_idx), aabbswap))
                                 {
                                 if (m_aabb_tree.isNodeLeaf(cur_node_idx))
                                     {
                                     for (unsigned int cur_p = 0; cur_p < m_aabb_tree.getNodeNumParticles(cur_node_idx); cur_p++)
                                         {
+                                        
                                         // read in its position and orientation
                                         unsigned int j = m_aabb_tree.getNodeParticle(cur_node_idx, cur_p);
                                         Scalar4 postype_j;
@@ -861,8 +878,6 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                         Scalar4 postype_j_swap;
                                         Scalar4 orientation_j_swap;
                                         
-                                        //bool j_issamewith_i = false;
-                                        //bool j_issamewith_i_swap = false;
                                         if ( j != i  && j != i_swap) 
                                             {
                                             postype_j = h_postype.data[j];
@@ -880,7 +895,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                     }
                                                 else
                                                     {
-                                                    // If this is particle i and we are in an outside image, use the translated position and orientation
+                                                    // If this is particle swap and we are in an outside image, use the translated position and orientation
                                                     postype_j_swap = make_scalar4(pos_swap.x, pos_swap.y, pos_swap.z, postype_swap.w);
                                                     orientation_j_swap = quat_to_scalar4(shape_swap.orientation);
                                                     }
@@ -909,7 +924,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                     }
                                                 else
                                                     {
-                                                    // If this is particle i and we are in an outside image, use the translated position and orientation
+                                                    // If this is particle i and swap, and we are in an outside image, use the translated position and orientation
                                                         postype_j_swap = make_scalar4(pos_swap.x, pos_swap.y, pos_swap.z, postype_swap.w);
                                                         orientation_j_swap = quat_to_scalar4(shape_swap.orientation);
                                                         postype_j = make_scalar4(pos_i.x, pos_i.y, pos_i.z, postype_i.w);
@@ -919,21 +934,17 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                         
                                         // put particles in coordinate system of particle i
                                         vec3<Scalar> r_ij = vec3<Scalar>(postype_j) - pos_i_image;
+                                        
+                                        // put particles in coordinate system of particle swap
                                         vec3<Scalar> r_ij_swap = vec3<Scalar>(postype_j_swap) - pos_swap_image;
 
                                         unsigned int typ_j = __scalar_as_int(postype_j.w);
                                         Shape shape_j(quat<Scalar>(orientation_j), m_params[typ_j]);
-                                        Scalar diameter_j = h_diameter.data[j];//shape_j.getCircumsphereDiameter(tag_j); 
-                                        //m_exec_conf->msg->notice(5) << "Is the error here (2) ? "  << std::endl;
-                                        //m_exec_conf->msg->notice(5) << "i_swap = "  << i_swap << std::endl;
-                                        //m_exec_conf->msg->notice(5) << "i = "  << i << std::endl;
-                                        //m_exec_conf->msg->notice(5) << "j = "  << j << std::endl;
-                                        //I GET IT!!!
+                                        Scalar diameter_j = h_diameter.data[j];
+                                        
                                         unsigned int typ_j_swap = __scalar_as_int(postype_j_swap.w);
                                         Shape shape_j_swap(quat<Scalar>(orientation_j_swap), m_params[typ_j_swap]);
-                                        Scalar diameter_j_swap = h_diameter.data[j];//shape_j_swap.getCircumsphereDiameter(tag_j); 
-                                        //unsigned int typ_j = __scalar_as_int(postype_j.w);
-                                        //Shape shape_j(quat<Scalar>(orientation_j), m_params[typ_j]);
+                                        Scalar diameter_j_swap = h_diameter.data[j];
 
                                         OverlapReal rcut = 0.0;
                                         OverlapReal rcut_swap = 0.0;
@@ -955,13 +966,15 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                 break;
                                             }
                                         
-                                        // If there is no overlap and m_patch is not NULL, calculate energy
-                                        // I'm not sure yet how I want to organize interacting hard/soft particles. For now, I only consider attractive interactions
-                                        // Only when the particles are soft
+                                        /* If there is no overlap and m_patch is not NULL, calculate energy
+                                         * I'm not sure yet how I want to organize this for loop when there's combined hard/soft interactions. 
+                                         * For now, I only compute these interaction energies only when hard particles are absent.
+                                         */
                                         if (m_soft_mode && m_patch && !m_patch_log && (dot(r_ij,r_ij) <= rcut*rcut || dot(r_ij_swap,r_ij_swap) <= rcut_swap*rcut_swap) ) 
                                             {
-                                                //So I gotta check if particle j is inside the rcut domain of i or i_swap
-                                                // So, you could have particle j in either i or i swap . . . .
+                                                //Check if particle j is inside the rcut domain of i or i_swap
+                                                
+                                                //First case: j inside domain of i but not in i_swap
                                                 if (dot(r_ij,r_ij) != 0 &&  dot(r_ij,r_ij) <= rcut*rcut &&  dot(r_ij_swap,r_ij_swap) > rcut_swap*rcut_swap)
                                                 { 
                                                     // deltaU = U_old - U_new: subtract energy of new configuration
@@ -979,6 +992,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                                                h_charge.data[j]
                                                                                );
                                                 }
+                                                //Second case: j inside domain of i_swap but not in i
                                                 else if ( dot(r_ij_swap,r_ij_swap) != 0 && dot(r_ij_swap,r_ij_swap) <= rcut_swap*rcut_swap && dot(r_ij,r_ij) > rcut*rcut)
                                                 {
                                                     patch_field_energy_diff -= m_patch->energy(r_ij_swap, typ_swap,
@@ -995,6 +1009,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                                                h_charge.data[j]
                                                                                );
                                                 }
+                                                //Second case: j inside domain of i_swap and i
                                                 else if ( dot(r_ij,r_ij) != 0 && dot(r_ij_swap,r_ij_swap) != 0 && dot(r_ij_swap,r_ij_swap) <= rcut_swap*rcut_swap &&  dot(r_ij,r_ij) <= rcut*rcut)
                                                 {
                                                     patch_field_energy_diff -= m_patch->energy(r_ij, typ_i,
@@ -1008,6 +1023,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                                                diameter_j,
                                                                                h_charge.data[j]
                                                                                );
+                                                    //then substract, yet again for the swap particle!
                                                     patch_field_energy_diff -= m_patch->energy(r_ij_swap, typ_swap,
                                                                                quat<float>(shape_swap.orientation),
                                                                                //h_diameter.data[i],
@@ -1022,12 +1038,18 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                                                                                h_charge.data[j]
                                                                                );
                                                 }
-                                            //then substract, yet again for the swap particle!
+                                                //Final case: j doesn't overlap at all. This case shouldn't happen since the outer loops ensure that this never happen
+                                                //But it's good to have the else statement, just in case.
+                                                else
+                                                {
+                                                    continue;
+                                                }
                                             }//end of energy evaluation
-                                        }
-                                    }
-                                }
-                            else
+                                        }//end of for loop of particle j
+                                    }//end of if statement for tree node 
+                                }//end of if statement for looking and if the bounding box which has all possible j-th particles overlaps
+                                 //with the bounding box of particle i and particle j.
+                             else
                                 {
                                 // skip ahead
                                 cur_node_idx += m_aabb_tree.getNodeSkip(cur_node_idx);
@@ -1038,7 +1060,7 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                     }  // end loop over AABB nodes
                     if (overlap)
                         break;
-                } // end loop over images
+            } // end loop over images
 
             // calculate old patch energy only if m_patch not NULL and no overlaps
             // these calculations must also be adjusted (for instance if they are doing swap moves or not)
@@ -1050,11 +1072,14 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                     detail::AABB aabb = aabb_i_local;
                     aabb.translate(pos_i_image);
 
-                    //I'll have to construct yet another aabb tree for the second particle (swappos)!
+                    //Construct yet another aabb for the second particle (swapped particle)!
                     vec3<Scalar> pos_swap_image = pos_swap_old + m_image_list[cur_image];
                     detail::AABB aabbswap = aabb_swap_local;
                     aabbswap.translate(pos_swap_image);
+                    
                     // stackless search
+                    // For loops only go through nodes of the AABB tree.
+                    // All image boxes (including the primary)
                     for (unsigned int cur_node_idx = 0; cur_node_idx < m_aabb_tree.getNumNodes(); cur_node_idx++)
                         {
                             if (move_type_translate)
@@ -1290,14 +1315,15 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                     } // end loop over images
                 } // end if (m_patch)
 
-            // Add external energetic contribution
+            //Take out the external field calculation, because that's not supported yet. 
             /*
             if (m_external)
                 {
                 patch_field_energy_diff -= m_external->energydiff(i, pos_old, shape_old, pos_i, shape_i);
                 }
             */
-            // If no overlaps and Metropolis criterion is met, accept
+            
+            // If there's no overlaps and Metropolis criterion is met, accept
             // trial move and update positions  and/or orientations.
             if (!overlap && hoomd::detail::generate_canonical<double>(rng_i) < slow::exp(patch_field_energy_diff))
                 {
@@ -1329,25 +1355,17 @@ void IntegratorHPMCPolydisperse<Shape>::update(unsigned int timestep)
                             {
                                 counters.swap_accept_count++;
                             }
-                    
-
-                        /*
-                        if (m_swap_mode)
-                            {
-                            }
-                        */
-                        //Don't forget to reflect those changes to the actual particle data
-                        //m_exec_conf->msg->notice(2) << "Initially particle "<< i_swap << "has radius" << h_diameter.data[i_swap] << std::endl;//timestep << std::endl;
                         if (m_swap_mode)
                         {
+                            //Commit the changed diameter_swap and diameter_i to h_diameter!
                             h_diameter.data[i_swap] = diameter_swap;
-                            //m_exec_conf->msg->notice(2) << "Now particle "<< i_swap << "has radius" << h_diameter.data[i_swap] << std::endl;//timestep << std::endl;
-                            //m_exec_conf->msg->notice(2) << "Next, initially particle "<< i << "has radius" << h_diameter.data[i] << std::endl;//timestep << std::endl;
                             h_diameter.data[i] = diameter_i;
-                            //m_exec_conf->msg->notice(2) << "Now particle "<< i << "has radius" << h_diameter.data[i] << std::endl;//timestep << std::endl;
                         }
                         else
                         {
+                            //This is swapping positions. Due to the need of updating AABB Tree, this 
+                            //type of move is considerably slower than updating diameter.
+                            //
                             // update the position of the particle in the tree for future updates
                             detail::AABB aabb = aabb_i_local;
                             aabb.translate(pos_i);
@@ -1479,7 +1497,7 @@ unsigned int IntegratorHPMCPolydisperse<Shape>::countOverlaps(unsigned int times
 
         // Check particle against AABB tree for neighbors
         //m_exec_conf->msg->notice(2) << "What is my diameter: " << diameter_i << std::endl;
-        detail::AABB aabb_i_local = shape_i.getAABB(vec3<Scalar>(0,0,0), OverlapReal(0.5)*diameter_i);
+        detail::AABB aabb_i_local = shape_i.getAABB(vec3<Scalar>(0,0,0), OverlapReal(0.5)*shape_i.getMaxCircumsphereDiameter());
 
         const unsigned int n_images = m_image_list.size();
         for (unsigned int cur_image = 0; cur_image < n_images; cur_image++)
@@ -1521,11 +1539,11 @@ unsigned int IntegratorHPMCPolydisperse<Shape>::countOverlaps(unsigned int times
                                 {
 
                                 #ifdef ENABLE_DEBUG
-                                m_exec_conf->msg->notice(6) << "Overlap between:  " << j << "and particle " << i << std::endl;
-                                m_exec_conf->msg->notice(6) << "Diameter_j: " << h_diameter.data[j] << "and particle " << h_diameter.data[i]<< std::endl;
+                                m_exec_conf->msg->notice(5) << "Overlap between:  " << j << "and particle " << i << std::endl;
+                                m_exec_conf->msg->notice(5) << "Diameter_j: " << h_diameter.data[j] << "and particle " << h_diameter.data[i]<< std::endl;
                                 vec3<OverlapReal> dr(r_ij);
                                 OverlapReal rsq = dot(dr,dr);
-                                m_exec_conf->msg->notice(6) << "r_ij squared: " << rsq << std::endl;
+                                m_exec_conf->msg->notice(5) << "r_ij squared: " << rsq << std::endl;
                                 #endif
                                 overlap_count++;
                                 if (early_exit)
@@ -1631,9 +1649,9 @@ float IntegratorHPMCPolydisperse<Shape>::computePatchEnergy(unsigned int timeste
 
         // the cut-off
         Scalar r_cut = 0;//m_patch->getRCut() + 0.5*m_patch->getAdditiveCutoff(typ_i);
-
+        Scalar maxdiameter = shape_i.getMaxCircumsphereDiameter();
         // subtract minimum AABB extent from search radius
-        OverlapReal R_query = std::max(OverlapReal(0.5)*d_i,
+        OverlapReal R_query = std::max(maxdiameter/OverlapReal(2.0),//diameter_i,//OverlapReal(2.0),
             r_cut-getMinCoreDiameter()/(OverlapReal)2.0);
         detail::AABB aabb_i_local = detail::AABB(vec3<Scalar>(0,0,0),R_query);
 

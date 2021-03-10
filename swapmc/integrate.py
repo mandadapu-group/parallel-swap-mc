@@ -16,16 +16,14 @@ class sph_poly(hoomd.hpmc.integrate.mode_hpmc):
     Args:
         seed (int): Random number seed
         d (float): Maximum move displacement, Scalar to set for all types, or a dict containing {type:size} to set by type.
-        a (float, only with **orientable=True**): Maximum rotation move, Scalar to set for all types, or a dict containing {type:size} to set by type. (added in version 2.3)
-        move_ratio (float, only used with **orientable=True**): Ratio of translation moves to rotation moves. (added in version 2.3)
-        nselect (int): The number of trial moves to perform in each cell.
-        implicit (bool): Flag to enable implicit depletants.
-        depletant_mode (string, only with **implicit=True**): Where to place random depletants, either 'circumsphere' or 'overlap_regions'
-            (added in version 2.2)
+        swap_prob: Probability to perform swap over translational moves.
+        nselect (int): The number of trial sweep moves to perform in each cell.
+        swap_mode (string): choose whether you want to swap diameters 'diameter' or position 'position'
+        df_reject: this is the maximum separation distance between two particles. Larger than this, then swap between the two is always rejected.
         restore_state(bool): Restore internal state from initialization file when True. See :py:class:`mode_hpmc`
                              for a description of what state data restored. (added in version 2.2)
 
-    Hard particle Monte Carlo integration method for spheres.
+    Hard and soft particle Monte Carlo integration method for (polydisperse) spheres.
 
     Sphere parameters:
 
@@ -34,59 +32,34 @@ class sph_poly(hoomd.hpmc.integrate.mode_hpmc):
     * *ignore_statistics* (**default: False**) - set to True to disable ignore for statistics tracking
     * *ignore_overlaps* (**default: False**) - set to True to disable overlap checks between this and other types with *ignore_overlaps=True*
 
-        * .. deprecated:: 2.1
-             Replaced by :py:class:`interaction_matrix`.
-
     Examples::
 
-        mc = hpmc.integrate.sphere(seed=415236)
-        mc = hpmc.integrate.sphere(seed=415236, d=0.3)
-        mc.shape_param.set('A', diameter=1.0)
-        mc.shape_param.set('B', diameter=2.0)
-        mc.shape_param.set('C', diameter=1.0, orientable=True)
+        mc = hpmc.integrate.sph_poly(seed=415236)
+        mc.shape_param.set('A')
         print('diameter = ', mc.shape_param['A'].diameter)
 
-    Depletants Example::
-
-        mc = hpmc.integrate.sphere(seed=415236, d=0.3, a=0.4, implicit=True, depletant_mode='circumsphere')
-        mc.set_param(nselect=8,nR=3,depletant_type='B')
-        mc.shape_param.set('A', diameter=1.0)
-        mc.shape_param.set('B', diameter=.1)
     """
 
-    def __init__(self, seed, d=0.1, a=0.1, move_ratio=0.5, nselect=4, swap_mode="diameter", soft_mode="hard",dr_reject=np.inf,implicit=False, depletant_mode='circumsphere',restore_state=False):
+    def __init__(self, seed, d=0.1, swap_prob=0.2, nselect=1, swap_mode="diameter", soft_mode="hard",dr_reject=np.inf,implicit=False,restore_state=False):
         hoomd.util.print_status_line();
 
         # initialize base class
+        #depletant_mode: Where to place random depletants, either ‘circumsphere’ or ‘overlap_regions’. The swap code doesn't use, but it needs to be there
+        #for consistenty with HOOMD-blue's HPMC codebase.
+        depletant_mode='circumsphere'
         hoomd.hpmc.integrate.mode_hpmc.__init__(self,implicit, depletant_mode);
 
         # initialize the reflected c++ class
-        #Disable CUDA for now
-        #if not hoomd.context.exec_conf.isCUDAEnabled():
-        #    if(implicit):
-                # In C++ mode circumsphere = 0 and mode overlap_regions = 1
-        #        if depletant_mode_circumsphere(depletant_mode):
-        #            self.cpp_integrator = _hpmc.IntegratorHPMCMonoImplicitSphere(hoomd.context.current.system_definition, seed, 0)
-        #        else:
-        #            self.cpp_integrator = _hpmc.IntegratorHPMCMonoImplicitSphere(hoomd.context.current.system_definition, seed, 1)
-        #    else:
         self.cpp_integrator = _swapmc.IntegratorHPMCPolydisperseSwap(hoomd.context.current.system_definition, seed);
-        #else:
-        #    cl_c = _hoomd.CellListGPU(hoomd.context.current.system_definition);
-        #    hoomd.context.current.system.overwriteCompute(cl_c, "auto_cl2")
-        #    if not implicit:
-        #        self.cpp_integrator = _hpmc.IntegratorHPMCMonoGPUSphere(hoomd.context.current.system_definition, cl_c, seed);
-        #    else:
-        #        if depletant_mode_circumsphere(depletant_mode):
-        #            self.cpp_integrator = _hpmc.IntegratorHPMCMonoImplicitGPUSphere(hoomd.context.current.system_definition, cl_c, seed);
-        #        else:
-        #            self.cpp_integrator = _hpmc.IntegratorHPMCMonoImplicitNewGPUSphere(hoomd.context.current.system_definition, cl_c, seed);
 
         # set the default parameters
         hoomd.hpmc.integrate.setD(self.cpp_integrator,d);
-        hoomd.hpmc.integrate.setA(self.cpp_integrator,a);
+        
+        # setA method sets the amount orientation perturbation. We don't need it, but it is there for consistency with the rest of HOOMD-Blue's
+        #HPMC codebase.
+        hoomd.hpmc.integrate.setA(self.cpp_integrator,0.1);
 
-        self.cpp_integrator.setMoveRatio(move_ratio);
+        self.cpp_integrator.setTransProb(1-swap_prob);
         self.cpp_integrator.setSwapMode(swap_mode);
         self.cpp_integrator.setSoftMode(soft_mode);
         self.cpp_integrator.setdrReject(dr_reject);

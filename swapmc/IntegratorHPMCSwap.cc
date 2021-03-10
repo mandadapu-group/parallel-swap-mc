@@ -19,7 +19,7 @@ namespace hpmc
 
 IntegratorHPMCSwap::IntegratorHPMCSwap(std::shared_ptr<SystemDefinition> sysdef,
                                unsigned int seed)
-    : Integrator(sysdef, 0.005), m_seed(seed),  m_move_ratio(1.0), m_nselect(4),
+    : Integrator(sysdef, 0.005), m_seed(seed),  m_move_prob(1.0), m_nselect(4),
       //m_nominal_width(1.0), m_extra_ghost_width(0), m_external_base(NULL), m_patch_log(false),
       m_nominal_width(1.0), m_extra_ghost_width(0), m_patch_log(false), m_swap_mode(false), m_soft_mode(false), m_dr_reject(0), 
       m_past_first_run(false)
@@ -171,7 +171,7 @@ Scalar IntegratorHPMCSwap::getLogValue(const std::string& quantity, unsigned int
         }
     else if (quantity == "hpmc_move_ratio")
         {
-        return getMoveRatio();
+        return getTransProb();
         }
     else if (quantity == "hpmc_overlap_count")
         {
@@ -324,14 +324,14 @@ void export_IntegratorHPMCSwap(py::module& m)
     .def(py::init< std::shared_ptr<SystemDefinition>, unsigned int >())
     .def("setD", &IntegratorHPMCSwap::setD)
     .def("setA", &IntegratorHPMCSwap::setA)
-    .def("setMoveRatio", &IntegratorHPMCSwap::setMoveRatio)
+    .def("setTransProb", &IntegratorHPMCSwap::setTransProb)
     .def("setSwapMode", &IntegratorHPMCSwap::setSwapMode)
     .def("setSoftMode", &IntegratorHPMCSwap::setSoftMode)
     .def("setdrReject", &IntegratorHPMCSwap::setdrReject)
     .def("setNSelect", &IntegratorHPMCSwap::setNSelect)
     .def("getD", &IntegratorHPMCSwap::getD)
     .def("getA", &IntegratorHPMCSwap::getA)
-    .def("getMoveRatio", &IntegratorHPMCSwap::getMoveRatio)
+    .def("getTransProb", &IntegratorHPMCSwap::getTransProb)
     .def("getNSelect", &IntegratorHPMCSwap::getNSelect)
     .def("getMaxCoreDiameter", &IntegratorHPMCSwap::getMaxCoreDiameter)
     .def("countOverlaps", &IntegratorHPMCSwap::countOverlaps)

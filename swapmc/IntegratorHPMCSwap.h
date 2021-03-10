@@ -169,7 +169,8 @@ class PYBIND11_EXPORT IntegratorHPMCSwap : public Integrator
             return maxD;
             }
 
-        //! Change maximum rotation
+        //! Change maximum rotation.
+        // The swap code doesn't need this, but it is here for consistency with the rest of HPMC HOOMD-blue code
         /*! \param a new a to set
          *! \param type type to which d will be set
         */
@@ -180,6 +181,7 @@ class PYBIND11_EXPORT IntegratorHPMCSwap : public Integrator
             }
 
         //! Get maximum rotation
+        // The swap code doesn't need this, but it is here for consistency with the rest of HPMC HOOMD-blue code
         inline Scalar getA(unsigned int typ)
             {
             ArrayHandle<Scalar> h_a(m_a, access_location::host, access_mode::read);
@@ -187,24 +189,25 @@ class PYBIND11_EXPORT IntegratorHPMCSwap : public Integrator
             }
 
         //! Get array of rotation move sizes
+        // The swap code doesn't need this, but it is here for consistency with the rest of HPMC HOOMD-blue code
         const GPUArray<Scalar>& getAArray() const
             {
             return m_a;
             }
 
-        //! Change move ratio
-        /*! \param move_ratio new move_ratio to set
+        //! Change translational move probability
+        /*! \param trans_prob new translational probability to set
         */
-        void setMoveRatio(Scalar move_ratio)
+        void setTransProb(Scalar trans_prob)
             {
-            m_move_ratio = move_ratio;
+            m_move_prob = trans_prob;
             }
 
-        //! Get move ratio
-        //! \returns ratio of translation versus rotation move attempts
-        inline double getMoveRatio()
+        //! Get translational move probability
+        //! \returns probability of translation versus swap move attempts
+        inline double getTransProb()
             {
-            return m_move_ratio;
+            return m_move_prob;
             }
 
         //! Set nselect
@@ -380,7 +383,7 @@ class PYBIND11_EXPORT IntegratorHPMCSwap : public Integrator
 
     protected:
         unsigned int m_seed;                        //!< Random number seed
-        Scalar m_move_ratio;                  //!< Ratio of translation to rotation move attempts (*65535)
+        Scalar m_move_prob;                  //!< Ratio of translation to rotation move attempts (*65535)
         unsigned int m_nselect;                     //!< Number of particles to select for trial moves
 
         GPUVector<Scalar> m_d;                      //!< Maximum move displacement by type
