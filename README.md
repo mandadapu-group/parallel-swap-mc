@@ -31,7 +31,9 @@ The requirements for installing the plugin is the same as standard HOOMD, except
 
 
 ### Step 2: **[PLEASE READ]! Check Your HOOMD Installation**
-To compile this plugin, you (obviously) need to have HOOMD-Blue installed. However, this plugin depends very crucially on their *unstable* [JIT module](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html), which is not always installed if you follow [the steps in HOOMD-Blue's website](https://hoomd-blue.readthedocs.io/en/stable/installation.html). Thus, the successful installation of the plugin requires you to follow additional steps. To check if your HOOMD installation has the JIT package, just try to import it and see if Python gives an error:
+To compile this plugin, you (obviously) need to have HOOMD-Blue installed. This package has been tested on HOOMD v2.9 as well as v2.8. It is highly likely that it will not work on the upcoming v3.0 since they're including major changes in code organization. 
+
+More importantly, this plugin depends very crucially on their [JIT module](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html), which is not always installed if you follow [the steps in HOOMD-Blue's website](https://hoomd-blue.readthedocs.io/en/stable/installation.html). Thus, the successful installation of the plugin requires you to follow additional steps. To check if your HOOMD installation has the JIT package, just try to import it and see if Python gives an error:
 
 ```python
 import hoomd.jit
