@@ -158,7 +158,7 @@ Now, `make install'`will install the plugins into `${HOOMD_PLUGINS_DIR}`. When h
 
 The plugin works like HOOMD-Blue's HPMC, but with more limited features (see section **ParallelSwapMC vs. HOOMD-Blue's HPMC**). This means that **you don't have to import hoomd.hpmc to use the plugin**. In fact, running a Monte Carlo simulation with ParallelSwapMC works (practically) the same way as HPMC. 
 
-Below is a sample Python Script to run a continuous polydisperse particle system, whose particle size distribution is a uniform distribution: 
+Below is a sample Python Script to run a continuous polydisperse hard disks system, whose particle size distribution is a uniform distribution: 
 ```python
 import hoomd
 import hoomd.swapmc as swap
@@ -201,7 +201,67 @@ d = hoomd.dump.gsd("dump.gsd", period=100, group=hoomd.group.all(), dynamic=['at
 hoomd.run(10000);
 ```
 
-(More Instructions, coming soon . . .)
+Here's another script for a continuous polydisperse system interacting with a pair potential
+
+```python
+import hoomd
+import hoomd.swapmc as swap
+import numpy as np
+from numpy.random import uniform, seed
+
+seed(0)
+hoomd.context.initialize("--mode=cpu --notice-level=2");
+
+#Initialize Our Own Configuration using a Snapshot
+rho = 1.00
+LParticles = 16;
+NParticles = LParticles**2
+dmax = 1.0
+dmin = 0.1
+
+Length = 0.85*LParticles
+MyBox = hoomd.data.boxdim(L=Length, dimensions=2)
+snap = hoomd.data.make_snapshot(N=NParticles, box=MyBox, particle_types=['A'])
+snap.particles.types = ['A']
+
+def placePolydisperseOnSquare(snap):
+    for i in range(LParticles):
+        for j in range(LParticles):
+            snap.particles.position[i*LParticles+j,0] = Length*(i/LParticles-0.5)
+            snap.particles.position[i*LParticles+j,1] = Length*(j/LParticles-0.5)
+            snap.particles.position[i*LParticles+j,2] = 0
+            snap.particles.diameter[i*LParticles+j] = uniform(dmin,dmax)
+
+placePolydisperseOnSquare(snap)
+system = hoomd.init.read_snapshot(snap);
+
+#Set up the Monte Carlo 'integrator'
+mc = swap.integrate.sph_poly(d=0.2, seed=1,nselect=1,swap_prob=0.2, swap_mode='diameter', soft_mode="soft")
+mc.shape_param.set('A');
+patch = swap.patch.polydisperse(mc=mc, kT=0.25,scaledr_cut=1.25,v0=1.0,eps=0.2,model='polydisperse12')
+d = hoomd.dump.gsd("dump.gsd", period=100, group=hoomd.group.all(), dynamic=['attribute'],overwrite=True);
+hoomd.run(10000);
+```
+
+Note that the pair potentials available in this plugin are limited toa particular class where the pair potential is given by:
+
+![equation](https://latex.codecogs.com/gif.latex?%5Cphi%28r/%5Csigma_%7B%5Calpha%20%5Cbeta%7D%29%20%3D%20%5Cbegin%7Bcases%7D%20v_0%20%5Cleft%5B%5Cleft%28%5Cdfrac%7B%5Csigma_%7B%5Calpha%20%5Cbeta%7D%7D%7Br%7D%5Cright%29%5Em-%5Cleft%28%5Cdfrac%7B%5Csigma_%7B%5Calpha%20%5Cbeta%7D%7D%7Br%7D%5Cright%29%5En%5Cright%5D&plus;%5Csum_%7Bk%3D0%7D%5Eq%20c_k%20%5Cleft%28%5Cfrac%7Br%5E%7B%5Calpha%20%5Cbeta%7D%7D%7B%5Csigma_%7B%5Calpha%20%5Cbeta%7D%7D%20%5Cright%20%29%5E%7B2k%7D%26%20r/%5Csigma_%7B%5Calpha%20%5Cbeta%7D%20%5Cleq%20%5Ctilde%7Br%7D_c%20%5C%5C%200%20%26%20%5Ctext%7Botherwise%7D%20%5Cend%7Bcases%7D)
+
+![equation](https://latex.codecogs.com/gif.latex?%5Csigma_%7B%5Calpha%20%5Cbeta%7D%20%3D%20%5Cfrac%7B1%7D%7B2%7D%5Cleft%28%5Csigma_%5Calpha%20&plus;%5Csigma_%5Cbeta%5Cright%29%281-%5Cvarepsilon%7C%5Csigma_%5Calpha%20-%20%5Csigma_%5Cbeta%7C%29)
+
+The first term in the first equation is the standard repulsive and attractive interaction. The second term is an even polynomial ensuring smoothness up to q-th order at the cut off radius. 
+
+The models available to use and currently implemented are as follows:
+
+|   Model Name      |   q       |   m       |   n       | 
+|   :--------       |   :--:    |   :--:    |   :--:    |
+|   polydisperse12  |   2       |   12      |   0       |
+|   polydisperse18  |   2       |   18      |   0       |
+|   polydisperselj  |   2       |   12      |   6       |
+|   polydisperse10  |   3       |   10      |   0       |
+|   polydisperse106 |   2       |   10      |   6       |
+
+You will see in parallel-swap-mc/patch.py file that there are other pair potentials, but I haven't thoroughly tested them or haven't checked their implementation in a long time! So be please be aware. 
 
 ## **Developer Notes**
 
