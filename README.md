@@ -3,7 +3,7 @@
 
 ParallelSwapMC is a plug-in for HOOMD-Blue, a particle simulation toolkit, that allows Monte Carlo simulation of soft & hard continuous polydisperse particles on multi-CPUs. In particular, it adds moves which swap either the diameter or positions of the particles. The code is largely based on HOOMD-Blue's [Hard Particle Monte Carlo](https://hoomd-blue.readthedocs.io/en/stable/package-hpmc.html) (HPMC) and [Just-in-Time](https://hoomd-blue.readthedocs.io/en/stable/package-jit.html) (JIT) package.
 
-The plugin is currently under *beta* stage. For now, this file will be a temporary documentation for the plugin. 
+The plugin is ready to use! For now, this file will be a temporary documentation for the plugin. 
 
 ## **Contents** 
 
