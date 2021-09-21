@@ -23,7 +23,7 @@ namespace hpmc
 #define DEVICE
 #endif
 
-//! Storage for acceptance counters
+//! Storage for acceptance counters, now with swap moves
 /*! \ingroup hpmc_data_structs */
 struct hpmc_counters_swap_t : hpmc_counters_t
     {
@@ -49,11 +49,11 @@ struct hpmc_counters_swap_t : hpmc_counters_t
         }
 
     //! Get the number of moves
-    /*! \return The total number of moves
+    /*! \return The total number of translational moves
     */
     DEVICE unsigned long long int getNMoves()
         {
-        return translate_accept_count + translate_reject_count;//# + swap_accept_count + swap_reject_count;
+        return translate_accept_count + translate_reject_count;
         }
     };
 
@@ -72,10 +72,30 @@ DEVICE inline hpmc_counters_swap_t operator-(const hpmc_counters_swap_t& a, cons
     return result;
     }
 
-//! Storage for NPT acceptance counters
+//! Storage for NPT acceptance counters, now with swap moves
 /*! \ingroup hpmc_data_structs */
 struct hpmc_boxmc_counters_swap_t : hpmc_boxmc_counters_t
     {
+        unsigned long long int swap_accept_count;      //!< Count of accepted translation moves
+        unsigned long long int swap_reject_count;      //!< Count of rejected translation moves
+
+        //! Construct a zero set of counters
+        hpmc_boxmc_counters_swap_t()
+            {
+            swap_accept_count = 0;
+            swap_reject_count = 0;
+            }
+
+        //! Get the translate acceptance
+        /*! \returns The ratio of translation moves that are accepted, or 0 if there are no translation moves
+        */
+        DEVICE double getSwapAcceptance()
+            {
+            if (swap_reject_count + swap_accept_count == 0)
+                return 0.0;
+            else
+                return double(swap_accept_count) / double(swap_reject_count + swap_accept_count);
+            }
     };
 
 //! Take the difference of two sets of counters
