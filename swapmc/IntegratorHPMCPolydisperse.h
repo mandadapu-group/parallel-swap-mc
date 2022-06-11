@@ -6,7 +6,8 @@
 #define _INTEGRATOR_HPMC_POLYDISPERSE_H_
 
 /*! \file IntegratorHPMCPolydisperse.h
-    \brief Declaration of IntegratorHPMC
+    \brief Declaration of IntegratorHPMCPolydisperse routines
+    The meat of the swap Monte Carlo algorithm is right here!
 */
 
 #include <iostream>
@@ -211,6 +212,7 @@ class IntegratorHPMCPolydisperse : public IntegratorHPMCSwap
             pybind11::list rij, pybind11::list qi, pybind11::list qj,
             bool use_images, bool exclude_self);
         */
+        
         //! Return the requested ghost layer width
         virtual Scalar getGhostLayerWidth(unsigned int)
             {

@@ -5,19 +5,14 @@
 //#include <hoomd/hpmc/IntegratorHPMC.h>
 //#include <hoomd/hpmc/IntegratorHPMCMono.h>
 #include "PatchEnergyJITCustom.h"
-//#include "IntegratorHPMCMonoSwap.h"
 #include "IntegratorHPMCPolydisperse.h"
-//#include <hoomd/hpmc/UpdaterClusters.h>
-
-//#include <hoomd/hpmc/ShapeSphere.h>
 #include "ShapePolydisperse.h"
-//#include <hoomd/hpmc/ShapeProxy.h>
 #include "ShapeProxySwap.h"
 #include "UpdaterBoxMCSwap.h"
 
-//#include <hoomd/hpmc/GPUTree.h>
 
 /*
+//#include <hoomd/hpmc/GPUTree.h>
 #ifdef ENABLE_CUDA
 #include "IntegratorHPMCMonoGPU.h"
 #endif
@@ -74,40 +69,3 @@ PYBIND11_MODULE(_swapmc, m)
     //export_hpmc_implicit_counters(m); //<< check if this is part of mono or monoimplicit
     //export_hpmc_clusters_counters(m);
     }
-
-/*! \defgroup hpmc_integrators HPMC integrators
-*/
-
-/*! \defgroup hpmc_analyzers HPMC analyzers
-*/
-
-/*! \defgroup shape Shapes
-    Shape classes define the geometry of shapes and associated overlap checks
-*/
-
-/*! \defgroup vecmath Vector Math
-    Vector, matrix, and quaternion math routines
-*/
-
-/*! \defgroup hpmc_detail Details
-    HPMC implementation details
-    @{
-*/
-
-/*! \defgroup hpmc_data_structs Data structures
-    HPMC internal data structures
-*/
-
-/*! \defgroup hpmc_kernels HPMC kernels
-    HPMC GPU kernels
-*/
-
-/*! \defgroup minkowski Minkowski methods
-    Classes and functions related to Minkowski overlap detection methods
-*/
-
-/*! \defgroup overlap Other overlap methods
-    Classes and functions related to other (brute force) overlap methods
-*/
-
-/*! @} */
