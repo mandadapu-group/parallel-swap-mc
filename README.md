@@ -238,28 +238,18 @@ system = hoomd.init.read_snapshot(snap);
 #Set up the Monte Carlo 'integrator'
 mc = swap.integrate.sph_poly(d=0.2, seed=1,nselect=1,swap_prob=0.2, swap_mode='diameter', soft_mode="soft")
 mc.shape_param.set('A');
-patch = swap.patch.polydisperse(mc=mc, kT=0.25,scaledr_cut=1.25,v0=1.0,eps=0.2,model='polydisperse12')
+patch = swap.patch.polydisperse(mc=mc, v0 = 1.0, kT=0.25,scaledr_cut=1.25, eps=1.0, m_expnt = 12, n_expnt=0)
 d = hoomd.dump.gsd("dump.gsd", period=100, group=hoomd.group.all(), dynamic=['attribute'],overwrite=True);
 hoomd.run(10000);
 ```
 
-Note that the pair potentials available in this plugin are limited toa particular class where the pair potential is given by:
+Note that the pair potentials available in this plugin are limited to a particular class where the pair potential is given by:
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Cphi%28r/%5Csigma_%7B%5Calpha%20%5Cbeta%7D%29%20%3D%20%5Cbegin%7Bcases%7D%20v_0%20%5Cleft%5B%5Cleft%28%5Cdfrac%7B%5Csigma_%7B%5Calpha%20%5Cbeta%7D%7D%7Br%7D%5Cright%29%5Em-%5Cleft%28%5Cdfrac%7B%5Csigma_%7B%5Calpha%20%5Cbeta%7D%7D%7Br%7D%5Cright%29%5En%5Cright%5D&plus;%5Csum_%7Bk%3D0%7D%5Eq%20c_k%20%5Cleft%28%5Cfrac%7Br%5E%7B%5Calpha%20%5Cbeta%7D%7D%7B%5Csigma_%7B%5Calpha%20%5Cbeta%7D%7D%20%5Cright%20%29%5E%7B2k%7D%26%20r/%5Csigma_%7B%5Calpha%20%5Cbeta%7D%20%5Cleq%20%5Ctilde%7Br%7D_c%20%5C%5C%200%20%26%20%5Ctext%7Botherwise%7D%20%5Cend%7Bcases%7D)
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Csigma_%7B%5Calpha%20%5Cbeta%7D%20%3D%20%5Cfrac%7B1%7D%7B2%7D%5Cleft%28%5Csigma_%5Calpha%20&plus;%5Csigma_%5Cbeta%5Cright%29%281-%5Cvarepsilon%7C%5Csigma_%5Calpha%20-%20%5Csigma_%5Cbeta%7C%29)
 
 The first term in the first equation is the standard repulsive and attractive interaction. The second term is an even polynomial ensuring smoothness up to q-th order at the cut off radius. 
-
-The models available to use and currently implemented are as follows:
-
-|   Model Name      |   q       |   m       |   n       | 
-|   :--------       |   :--:    |   :--:    |   :--:    |
-|   polydisperse12  |   2       |   12      |   0       |
-|   polydisperse18  |   2       |   18      |   0       |
-|   polydisperselj  |   2       |   12      |   6       |
-|   polydisperse10  |   3       |   10      |   0       |
-|   polydisperse106 |   2       |   10      |   6       |
 
 You will see in parallel-swap-mc/patch.py file that there are other pair potentials, but I haven't thoroughly tested them or haven't checked their implementation in a long time! So be please be aware. 
 
