@@ -24,7 +24,8 @@ namespace hpmc
 {
 
 //! Update box for HPMC simulation in the NPT ensemble, etc.
-/*! The pressure parameter is beta*P. For a unitless reduced pressure, the user must adopt and apply the
+/*! Comment imported from HOOMD-blue v.2.x
+ * The pressure parameter is beta*P. For a unitless reduced pressure, the user must adopt and apply the
     convention of their choice externally. E.g. \f$ P^* \equiv \frac{P \sigma^3}{k_B T} \f$ implies a user should pass
     \f$ P^* / \sigma^3 \f$ as the UpdaterBoxMCSwap P parameter.
 */

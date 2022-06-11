@@ -15,7 +15,7 @@
 #define __SHAPE_POLYDISPERSE_H__
 
 /*! \file ShapePolydisperse.h
-    \brief Defines the sphere shape
+    \brief Defines the a polydisperse sphere shape. Adapted from ShapeSphere.h file from HOOMD-blue
 */
 
 // need to declare these class methods with __device__ qualifiers when building in nvcc
@@ -124,7 +124,8 @@ struct param_base
         }
     };
 //! Sphere shape template
-/*! ShapePolydisperse implements IntegratorHPMC's shape protocol. It serves at the simplest example of a shape for HPMC
+/*! ShapePolydisperse implements IntegratorHPMCSwap's shape protocol. It serves at the simplest example of a polydisperse shape for HPMC
+ * code that we have modified to include diameter swap moves
 
     The parameter defining a sphere is just a single Scalar, the sphere radius.
 

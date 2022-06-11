@@ -13,7 +13,8 @@
 
 // A Place Holder which adds more functions to the PatchEnergyJIT
 //! Evaluate patch energies via runtime generated code
-/*! This class enables the widest possible use-cases of patch energies in HPMC with low energy barriers for users to add
+/*! Comment imported from HOOMD-blue v.2.x
+ * This class enables the widest possible use-cases of patch energies in HPMC with low energy barriers for users to add
     custom interactions that execute with high performance. It provides a generic interface for returning the energy of
     interaction between a pair of particles. The actual computation is performed by code that is loaded and compiled at
     run time using LLVM.
@@ -33,6 +34,9 @@
 
     LLVM JIT is capable of calling any function in the hosts address space. PatchEnergyJIT does not take advantage of
     that, limiting the user to a very specific API for computing the energy between a pair of particles.
+
+    The only modification made is getScaledRCut function. Seems polydisperse systems has a distribution of diameter size,
+    the cut off radius is defined in a dimensionless manner (HOOMD's default is dimensionful)
 */
 class PatchEnergyJITCustom : public hpmc::PatchEnergy
     {

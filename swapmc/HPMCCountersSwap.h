@@ -11,8 +11,8 @@ namespace hpmc
 {
 
 /*! \file HPMCCountersSwap.h
-    \brief Declaration of counters whatnot
-    In the next implementation, I will need to get counters to do count swap moves but for now, it'll just inherit everything that hpmc_counters_t has
+    \brief Declaration of counters adapted from HPMCCounters.h
+    The only difference is that, instead of counting orientation moves, I am counting swap moves
 */
 
 // need to declare these class methods with __device__ qualifiers when building in nvcc

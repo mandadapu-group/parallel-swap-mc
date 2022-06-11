@@ -1,5 +1,9 @@
 // Copyright (c) 2009-2019 The Regents of the University of Michigan
 // This file is part of the HOOMD-blue project, released under the BSD 3-Clause License.
+/* This header file defines the shape proxy class, used by HOOMD-blue to manage details about the shape of a 
+ * particular particle. This is a modification from their ShapeProxy.h file, specializing certain functions
+ * to handle spherical particles with variable diameter size
+ */
 
 #ifndef __SHAPE_PROXY_SWAP_H__
 #define __SHAPE_PROXY_SWAP_H__
@@ -11,6 +15,7 @@
 #ifndef NVCC
 #include <hoomd/extern/pybind/include/pybind11/pybind11.h>
 #endif
+
 
 namespace hpmc{
 

@@ -1,3 +1,7 @@
+// Copyright (c) 2009-2019 The Regents of the University of Michigan
+// This file is part of the HOOMD-blue project, released under the BSD 3-Clause License.
+
+
 #include "ShapePolydisperse.h" // check
 #include <hoomd/managed_allocator.h>
 #include <hoomd/extern/gsd.h>
@@ -13,18 +17,9 @@
 
 #ifndef _GSD_HPMC_Schema_H_
 #define _GSD_HPMC_Schema_H_
-/*
-#include "ShapeConvexPolygon.h" // check
-#include "ShapeSpheropolygon.h" // check
-#include "ShapePolyhedron.h"
-#include "ShapeConvexPolyhedron.h" // check
-#include "ShapeSpheropolyhedron.h" // check
-#include "ShapeSimplePolygon.h" // check
-#include "ShapeEllipsoid.h" // check
-#include "ShapeFacetedEllipsoid.h"
-#include "ShapeSphinx.h"
-#include "ShapeUnion.h"
-*/
+
+/* This header file is adapted from GSDHPMCSchema.h
+ */
 
 template<class T>
 using param_array = typename std::vector<T, managed_allocator<T> >;

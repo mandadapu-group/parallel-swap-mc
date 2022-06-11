@@ -7,8 +7,6 @@
 from . import _swapmc
 from . import integrate
 from hoomd.hpmc import integrate as hpmcintegrate
-#from . import compute
-#from hoomd import _hoomd
 
 import math
 
