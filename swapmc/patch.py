@@ -14,12 +14,144 @@ import numpy as np
 from hoomd.swapmc import _swapmc as _plugin_patch
 #from hoomd.jit import patch
 
+
 #This python file faciltates the creation of relevant patch energies
 #we'll do shifted lennard jones and polydisperse's system for now
 #let's make different classes for different pair potentials. Of course, we'll let the user defined path energy to be available as well
-class lj(object):
-    R''' Define the patch energy of a lennard jones particle.
+class baseparticle(object):
+    R''' Define the base class for interaction potential of a particle. 
+    '''
+    def __init__(self):
+        hoomd.util.print_status_line();
+    
+    def init_checks(self,code, mc, llvm_ir_file, clang_exec, scaledr_cut):
+        # check if initialization has occurred
+        if hoomd.context.exec_conf is None:
+            raise RuntimeError('Error creating patch energy, call context.initialize() first');
 
+        # raise an error if this run is on the GPU
+        if hoomd.context.exec_conf.isCUDAEnabled():
+            hoomd.context.msg.error("Patch energies are not supported on the GPU\n");
+            raise RuntimeError("Error initializing patch energy");
+
+        # Find a clang executable if none is provided
+        if clang_exec is not None:
+            clang = clang_exec;
+        else:
+            clang = 'clang'
+
+        if code is not None and llvm_ir_file is None:
+            llvm_ir = self.compile_user(code, clang)
+        else:
+            # IR is a text file
+            with open(llvm_ir_file,'r') as f:
+                llvm_ir = f.read()
+
+        self.compute_name = "patch"
+        self.cpp_evaluator = _plugin_patch.PatchEnergyJITCustom(hoomd.context.exec_conf, llvm_ir, scaledr_cut);
+        mc.set_PatchEnergyEvaluator(self);
+
+        self.mc = mc
+        self.enabled = True
+        self.log = False
+
+    def compile_user(self, code, clang_exec, fn=None):
+        R'''Helper function to compile the provided code into an executable
+
+        Args:
+            code (str): C++ code to compile
+            clang_exec (str): The Clang executable to use
+            fn (str): If provided, the code will be written to a file.
+
+
+        .. versionadded:: 2.3
+        '''
+        cpp_function = """
+#include "hoomd/HOOMDMath.h"
+#include "hoomd/VectorMath.h"
+
+extern "C"
+{
+float eval(const vec3<float>& r_ij,
+    unsigned int type_i,
+    const quat<float>& q_i,
+    float d_i,
+    float charge_i,
+    unsigned int type_j,
+    const quat<float>& q_j,
+    float d_j,
+    float charge_j)
+    {
+"""
+        cpp_function += code
+        cpp_function += """
+    }
+}
+"""
+
+        include_path = os.path.dirname(hoomd.__file__) + '/include';
+        include_path_source = hoomd._hoomd.__hoomd_source_dir__;
+
+        if clang_exec is not None:
+            clang = clang_exec;
+        else:
+            clang = 'clang';
+
+        if fn is not None:
+            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o',fn,'-']
+        else:
+            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o','-','-']
+        p = subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+
+        # pass C++ function to stdin
+        output = p.communicate(cpp_function.encode('utf-8'))
+        llvm_ir = output[0].decode()
+
+        f = open("llvm_ir_file",'w')
+        f.write(llvm_ir)
+        f.close()
+        
+        if p.returncode != 0:
+            hoomd.context.msg.error("Error compiling provided code\n");
+            hoomd.context.msg.error("Command "+' '.join(cmd)+"\n");
+            hoomd.context.msg.error(output[1].decode()+"\n");
+            raise RuntimeError("Error initializing patch energy");
+
+        return llvm_ir
+
+    R''' Disable the patch energy and optionally enable it only for logging
+
+    Args:
+        log (bool): If true, only use patch energy as a log quantity
+
+    '''
+    def disable(self,log=None):
+        hoomd.util.print_status_line();
+
+        if log:
+            # enable only for logging purposes
+            self.mc.cpp_integrator.disablePatchEnergyLogOnly(log)
+            self.log = True
+        else:
+            # disable completely
+            self.mc.cpp_integrator.setPatchEnergy(None);
+            self.log = False
+
+        self.enabled = False
+
+    R''' (Re-)Enable the patch energy
+
+    '''
+    def enable(self):
+        hoomd.util.print_status_line()
+        self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
+
+#This python file faciltates the creation of relevant patch energies
+#we'll do shifted lennard jones and polydisperse's system for now
+#let's make different classes for different pair potentials. Of course, we'll let the user defined path energy to be available as well
+class lj(baseparticle):
+    R''' Define the patch energy of a lennard jones particle.
+    This comment is copied wholesale from HOOMD-blue v2.x
     Args:
         scaledr_cut (float): the scale of cutoff radius relative to particle center to center, beyond which all pair interactions are assumed 0.
         eps (float): uniform energetics
@@ -108,8 +240,9 @@ class lj(object):
     .. versionadded:: 2.3
     '''
     def __init__(self, mc, kT, scaledr_cut, eps, mode='shifted', llvm_ir_file=None, clang_exec=None):
-        hoomd.util.print_status_line();
-        #there is no need to write your own code. By definition, we're 
+        super().__init__()
+        
+        #This models truncated Lennard-Jones with no shifting in the potential energy value
         if (mode == 'truncated'):
             code = """
                             float rsq = dot(r_ij, r_ij);
@@ -128,6 +261,8 @@ class lj(object):
                                return 0.0f;
                                }}
                           """.format(scaledr_cut,eps/kT);
+        #This models truncated Lennard-Jones with shifting in the potential energy value
+        #so that its value goes to zero at the cut-off radius
         elif (mode == 'shifted'):
             code = """
                             float rsq = dot(r_ij, r_ij);
@@ -149,6 +284,8 @@ class lj(object):
                                return 0.0f;
                                }}
                           """.format(scaledr_cut,eps/kT);
+        #This models truncated Lennard-Jones with shifting in the potential energy value
+        #and force so that their value goes to zero at the cut-off radius
         elif (mode == 'force-shift'):
             code = """
                             float rsq = dot(r_ij, r_ij);
@@ -170,133 +307,15 @@ class lj(object):
                                return 0.0f;
                                }}
                           """.format(scaledr_cut,eps/kT);
-        # check if initialization has occurred
-        if hoomd.context.exec_conf is None:
-            raise RuntimeError('Error creating Lennard-Jones patch energy, call context.initialize() first');
+        self.init_checks(code, mc, llvm_ir_file, clang_exec, scaledr_cut)
 
-        # raise an error if this run is on the GPU
-        if hoomd.context.exec_conf.isCUDAEnabled():
-            hoomd.context.msg.error("Patch energies are not supported on the GPU\n");
-            raise RuntimeError("Error initializing patch energy");
-
-        # Find a clang executable if none is provided
-        if clang_exec is not None:
-            clang = clang_exec;
-        else:
-            clang = 'clang'
-
-        if code is not None and llvm_ir_file is None:
-            llvm_ir = self.compile_user(code, clang)
-        else:
-            # IR is a text file
-            with open(llvm_ir_file,'r') as f:
-                llvm_ir = f.read()
-
-        self.compute_name = "patch"
-        self.cpp_evaluator = _plugin_patch.PatchEnergyJITCustom(hoomd.context.exec_conf, llvm_ir, scaledr_cut);
-        mc.set_PatchEnergyEvaluator(self);
-
-        self.mc = mc
-        self.enabled = True
-        self.log = False
-
-    def compile_user(self, code, clang_exec, fn=None):
-        R'''Helper function to compile the provided code into an executable
-
-        Args:
-            code (str): C++ code to compile
-            clang_exec (str): The Clang executable to use
-            fn (str): If provided, the code will be written to a file.
-
-
-        .. versionadded:: 2.3
-        '''
-        cpp_function = """
-#include "hoomd/HOOMDMath.h"
-#include "hoomd/VectorMath.h"
-
-extern "C"
-{
-float eval(const vec3<float>& r_ij,
-    unsigned int type_i,
-    const quat<float>& q_i,
-    float d_i,
-    float charge_i,
-    unsigned int type_j,
-    const quat<float>& q_j,
-    float d_j,
-    float charge_j)
-    {
-"""
-        cpp_function += code
-        cpp_function += """
-    }
-}
-"""
-
-        include_path = os.path.dirname(hoomd.__file__) + '/include';
-        include_path_source = hoomd._hoomd.__hoomd_source_dir__;
-
-        if clang_exec is not None:
-            clang = clang_exec;
-        else:
-            clang = 'clang';
-
-        if fn is not None:
-            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o',fn,'-']
-        else:
-            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o','-','-']
-        p = subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-
-        # pass C++ function to stdin
-        output = p.communicate(cpp_function.encode('utf-8'))
-        llvm_ir = output[0].decode()
-
-        f = open("llvm_ir_file",'w')
-        f.write(llvm_ir)
-        f.close()
-        
-        if p.returncode != 0:
-            hoomd.context.msg.error("Error compiling provided code\n");
-            hoomd.context.msg.error("Command "+' '.join(cmd)+"\n");
-            hoomd.context.msg.error(output[1].decode()+"\n");
-            raise RuntimeError("Error initializing patch energy");
-
-        return llvm_ir
-
-    R''' Disable the patch energy and optionally enable it only for logging
-
-    Args:
-        log (bool): If true, only use patch energy as a log quantity
-
-    '''
-    def disable(self,log=None):
-        hoomd.util.print_status_line();
-
-        if log:
-            # enable only for logging purposes
-            self.mc.cpp_integrator.disablePatchEnergyLogOnly(log)
-            self.log = True
-        else:
-            # disable completely
-            self.mc.cpp_integrator.setPatchEnergy(None);
-            self.log = False
-
-        self.enabled = False
-
-    R''' (Re-)Enable the patch energy
-
-    '''
-    def enable(self):
-        hoomd.util.print_status_line()
-        self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
-
-class softrepulsive(object):
+class softrepulsive(baseparticle):
     R''' Define the patch energy of a soft-repulsive particle.
     '''
     def __init__(self, mc, kT, scaledr_cut, eps, mode='shifted', llvm_ir_file=None, clang_exec=None):
-        hoomd.util.print_status_line();
-        #there is no need to write your own code. By definition, we're 
+        super().__init__()
+        #hoomd.util.print_status_line();
+        #This models truncated Lennard-Jones with no shifting in the potential energy value
         if (mode == 'truncated'):
             code = """
                             float rsq = dot(r_ij, r_ij);
@@ -357,424 +376,53 @@ class softrepulsive(object):
                                return 0.0f;
                                }}
                           """.format(scaledr_cut,eps/kT);
-        # check if initialization has occurred
-        if hoomd.context.exec_conf is None:
-            raise RuntimeError('Error creating Lennard-Jones patch energy, call context.initialize() first');
+        self.init_checks(code, mc, llvm_ir_file, clang_exec, scaledr_cut)
 
-        # raise an error if this run is on the GPU
-        if hoomd.context.exec_conf.isCUDAEnabled():
-            hoomd.context.msg.error("Patch energies are not supported on the GPU\n");
-            raise RuntimeError("Error initializing patch energy");
-
-        # Find a clang executable if none is provided
-        if clang_exec is not None:
-            clang = clang_exec;
-        else:
-            clang = 'clang'
-
-        if code is not None and llvm_ir_file is None:
-            llvm_ir = self.compile_user(code, clang)
-        else:
-            # IR is a text file
-            with open(llvm_ir_file,'r') as f:
-                llvm_ir = f.read()
-
-        
-        self.compute_name = "patch"
-        self.cpp_evaluator = _plugin_patch.PatchEnergyJITCustom(hoomd.context.exec_conf, llvm_ir, scaledr_cut);
-        mc.set_PatchEnergyEvaluator(self);
-
-        self.mc = mc
-        self.enabled = True
-        self.log = False
-
-    def compile_user(self, code, clang_exec, fn=None):
-        R'''Helper function to compile the provided code into an executable
-
-        Args:
-            code (str): C++ code to compile
-            clang_exec (str): The Clang executable to use
-            fn (str): If provided, the code will be written to a file.
-
-
-        .. versionadded:: 2.3
-        '''
-        cpp_function = """
-#include "hoomd/HOOMDMath.h"
-#include "hoomd/VectorMath.h"
-
-extern "C"
-{
-float eval(const vec3<float>& r_ij,
-    unsigned int type_i,
-    const quat<float>& q_i,
-    float d_i,
-    float charge_i,
-    unsigned int type_j,
-    const quat<float>& q_j,
-    float d_j,
-    float charge_j)
-    {
-"""
-        cpp_function += code
-        cpp_function += """
-    }
-}
-"""
-
-        include_path = os.path.dirname(hoomd.__file__) + '/include';
-        include_path_source = hoomd._hoomd.__hoomd_source_dir__;
-
-        if clang_exec is not None:
-            clang = clang_exec;
-        else:
-            clang = 'clang';
-
-        if fn is not None:
-            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o',fn,'-']
-        else:
-            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o','-','-']
-        p = subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-
-        # pass C++ function to stdin
-        output = p.communicate(cpp_function.encode('utf-8'))
-        llvm_ir = output[0].decode()
-
-        f = open("llvm_ir_file",'w')
-        f.write(llvm_ir)
-        f.close()
-        
-        if p.returncode != 0:
-            hoomd.context.msg.error("Error compiling provided code\n");
-            hoomd.context.msg.error("Command "+' '.join(cmd)+"\n");
-            hoomd.context.msg.error(output[1].decode()+"\n");
-            raise RuntimeError("Error initializing patch energy");
-
-        return llvm_ir
-
-    R''' Disable the patch energy and optionally enable it only for logging
-
-    Args:
-        log (bool): If true, only use patch energy as a log quantity
-
+class polydisperse(baseparticle):#object):
+    R''' Define the patch energy of a polydisperse lennard jones particle
     '''
-    def disable(self,log=None):
+    def __init__(self, mc, kT, scaledr_cut, v0, eps, m_expnt, n_expnt, llvm_ir_file=None, clang_exec=None):
         hoomd.util.print_status_line();
-
-        if log:
-            # enable only for logging purposes
-            self.mc.cpp_integrator.disablePatchEnergyLogOnly(log)
-            self.log = True
-        else:
-            # disable completely
-            self.mc.cpp_integrator.setPatchEnergy(None);
-            self.log = False
-
-        self.enabled = False
-
-    R''' (Re-)Enable the patch energy
-
-    '''
-    def enable(self):
-        hoomd.util.print_status_line()
-        self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
-
-class polydisperse(object):
-    R''' Define the patch energy of a polydisperse soft-repulsive
-    '''
-    def __init__(self, mc, kT, scaledr_cut, v0, eps, model, llvm_ir_file=None, clang_exec=None,kappa=3.0):
-        hoomd.util.print_status_line();
-
-        if (model == "polydisperse12"):
-            a = scaledr_cut
-            A = np.array([  [1,a**2,a**4],
-                            [0,2*a,4*a**3],
-                            [0,2,12*a**2]
-                            ])
-            b = np.array([-v0/a**12,12*v0/a**13,-156*v0/a**14])
-            c = np.linalg.solve(A,b)
-            code = """
-                            float rsq = dot(r_ij, r_ij);
-                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
-                            float rcut  = {}*(sigma);
-                            if (rsq <= rcut*rcut)
-                               {{
-                               float v0   = {};
-                               float c0   = {};
-                               float c1   = {};
-                               float c2   = {};
-                               float sigmasq = sigma*sigma;
-                               float rsqinv = sigmasq / rsq;
-                               float _rsq = rsq / sigmasq;
-                               float r6inv = rsqinv*rsqinv*rsqinv;
-                               return v0*r6inv*r6inv+c0+c1*_rsq+c2*_rsq*_rsq;
-                               }}
-                            else
-                               {{
-                               return 0.0f;
-                               }}
-                          """.format(eps,scaledr_cut,v0/kT,c[0]/kT,c[1]/kT,c[2]/kT);
-        elif (model == "lennardjones"):
-            a = scaledr_cut
-            A = np.array([  [1,a**2,a**4],
-                            [0,2*a,4*a**3],
-                            [0,2,12*a**2]
-                            ])
-            b = np.array([-v0*(1/a**12-1/a**6),v0*(12*v0/a**13-6/a**7),-v0*(156/a**14-42/a**8)])
-            c = np.linalg.solve(A,b)
-            code = """
-                            float rsq = dot(r_ij, r_ij);
-                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
-                            float rcut  = {}*(sigma);
-                            if (rsq <= rcut*rcut)
-                               {{
-                               float v0   = {};
-                               float c0   = {};
-                               float c1   = {};
-                               float c2   = {};
-                               float sigmasq = sigma*sigma;
-                               float rsqinv = sigmasq / rsq;
-                               float _rsq = rsq / sigmasq;
-                               float r6inv = rsqinv*rsqinv*rsqinv;
-                               return v0*(r6inv*r6inv-r6inv)+c0+c1*_rsq+c2*_rsq*_rsq;
-                               }}
-                            else
-                               {{
-                               return 0.0f;
-                               }}
-                          """.format(eps,scaledr_cut,v0/kT,c[0]/kT,c[1]/kT,c[2]/kT);
-        elif (model == "polydisperse18"):
-            a = scaledr_cut
-            A = np.array([  [1,a**2,a**4],
-                            [0,2*a,4*a**3],
-                            [0,2,12*a**2]
-                            ])
-            b = np.array([-v0*(1/a**18),(18*v0/a**19),-v0*(342/a**20)])
-            c = np.linalg.solve(A,b)
-            code = """
-                            float rsq = dot(r_ij, r_ij);
-                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
-                            float rcut  = {}*(sigma);
-                            if (rsq <= rcut*rcut)
-                               {{
-                               float v0   = {};
-                               float c0   = {};
-                               float c1   = {};
-                               float c2   = {};
-                               float sigmasq = sigma*sigma;
-                               float rsqinv = sigmasq / rsq;
-                               float _rsq = rsq / sigmasq;
-                               float r6inv = rsqinv*rsqinv*rsqinv;
-                               return v0*(r6inv*r6inv*r6inv)+c0+c1*_rsq+c2*_rsq*_rsq;
-                               }}
-                            else
-                               {{
-                               return 0.0f;
-                               }}
-                          """.format(eps,scaledr_cut,v0/kT,c[0]/kT,c[1]/kT,c[2]/kT);
-        elif (model == "polydisperse10"):
-            a = scaledr_cut
-            c0 =  -(56.0)*v0/(a**10);
-            c1 =  (140.0)*v0/(a**12);
-            c2 =  -(120.0)*v0/(a**14);
-            c3 =  (35.0)*v0/(a**16);
-            code = """
-                            float rsq = dot(r_ij, r_ij);
-                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
-                            float rcut  = {}*(sigma);
-                            if (rsq <= rcut*rcut)
-                               {{
-                               float v0   = {};
-                               float c0   = {};
-                               float c1   = {};
-                               float c2   = {};
-                               float c3   = {};
-                               float sigmasq = sigma*sigma;
-                               float rsqinv = sigmasq / rsq;
-                               float _rsq = rsq / sigmasq;
-                               float r10inv = rsqinv*rsqinv*rsqinv*rsqinv*rsqinv;
-                               return v0*r10inv+c0+c1*_rsq+c2*_rsq*_rsq+c3*_rsq*_rsq*_rsq;
-                               }}
-                            else
-                               {{
-                               return 0.0f;
-                               }}
-                          """.format(eps,scaledr_cut,v0/kT,c0/kT,c1/kT,c2/kT,c3/kT);
-        elif (model == "polydisperse106"):
-            a = scaledr_cut
-            c0 = (-21 + 10*a**4)*v0/a**10
-            c1 =  -((5*(-7 + 3*a**4)*v0)/a**12)
-            c2 = (3*(-5 + 2*a**4)*v0)/a**14
-            code = """
-                            float rsq = dot(r_ij, r_ij);
-                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
-                            float rcut  = {}*(sigma);
-                            if (rsq <= rcut*rcut)
-                               {{
-                               float v0   = {};
-                               float c0   = {};
-                               float c1   = {};
-                               float c2   = {};
-                               float sigmasq = sigma*sigma;
-                               float rsqinv = sigmasq / rsq;
-                               float _rsq = rsq / sigmasq;
-                               float r10inv = rsqinv*rsqinv*rsqinv*rsqinv*rsqinv;
-                               return v0*(r10inv-rsqinv*rsqinv*rsqinv)+c0+c1*_rsq + c2*_rsq*_rsq;
-                               }}
-                            else
-                               {{
-                               return 0.0f;
-                               }}
-                          """.format(eps,scaledr_cut,v0/kT,c0/kT,c1/kT,c2/kT);
-        elif (model == "polydisperseyukawa"):
-            a = scaledr_cut
-            c0 = -((np.exp(-kappa*a)*(15 + 7*kappa*a + kappa**2*a**2)*v0)/(8*a))
-            c1 = (np.exp(-kappa*a)*(5 + 5*kappa*a + kappa**2*a**2)*v0)/(4*a**3)
-            c2 = -((np.exp(-kappa*a)*(3 + 3*kappa*a + kappa**2*a**2)*v0)/(8*a**5))
-            code = """
-                            float rsq = dot(r_ij, r_ij);
-                            float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
-                            float rcut  = {}*(sigma);
-                            if (rsq <= rcut*rcut)
-                               {{
-                               float v0   = {};
-                               float kappa = {};
-                               float c0   = {};
-                               float c1   = {};
-                               float c2   = {};
-                               float sigmasq = sigma*sigma;
-                               float rsqinv = sigmasq / rsq;
-                               float rinv = sqrtf(rsqinv);
-                               float _rsq = rsq / sigmasq;
-                               float _r = sqrtf(_rsq);
-                               float r10inv = rsqinv*rsqinv*rsqinv*rsqinv*rsqinv;
-                               return v0*exp(-_r*kappa)*rinv+c0+c1*_rsq + c2*_rsq*_rsq;
-                               }}
-                            else
-                               {{
-                               return 0.0f;
-                               }}
-                          """.format(eps,scaledr_cut,v0/kT,kappa,c0/kT,c1/kT,c2/kT);
-        else:
-            raise RuntimeError('Error creating Polydisperse patch energy. Not one of the available models. Perhaps theres a typo?');
-
-        # check if initialization has occurred
-        if hoomd.context.exec_conf is None:
-            raise RuntimeError('Error creating Lennard-Jones patch energy, call context.initialize() first');
-
-        # raise an error if this run is on the GPU
-        if hoomd.context.exec_conf.isCUDAEnabled():
-            hoomd.context.msg.error("Patch energies are not supported on the GPU\n");
-            raise RuntimeError("Error initializing patch energy");
-
-        # Find a clang executable if none is provided
-        if clang_exec is not None:
-            clang = clang_exec;
-        else:
-            clang = 'clang'
-
-        if code is not None and llvm_ir_file is None:
-            llvm_ir = self.compile_user(code, clang)
-        else:
-            # IR is a text file
-            with open(llvm_ir_file,'r') as f:
-                llvm_ir = f.read()
-
-        self.compute_name = "patch"
-        self.cpp_evaluator = _plugin_patch.PatchEnergyJITCustom(hoomd.context.exec_conf, llvm_ir, scaledr_cut);
-        mc.set_PatchEnergyEvaluator(self);
-
-        self.mc = mc
-        self.enabled = True
-        self.log = False
-
-    def compile_user(self, code, clang_exec, fn=None):
-        R'''Helper function to compile the provided code into an executable
-
-        Args:
-            code (str): C++ code to compile
-            clang_exec (str): The Clang executable to use
-            fn (str): If provided, the code will be written to a file.
-
-
-        .. versionadded:: 2.3
-        '''
-        cpp_function = """
-#include "hoomd/HOOMDMath.h"
-#include "hoomd/VectorMath.h"
-
-extern "C"
-{
-float eval(const vec3<float>& r_ij,
-    unsigned int type_i,
-    const quat<float>& q_i,
-    float d_i,
-    float charge_i,
-    unsigned int type_j,
-    const quat<float>& q_j,
-    float d_j,
-    float charge_j)
-    {
-"""
-        cpp_function += code
-        cpp_function += """
-    }
-}
-"""
-
-        include_path = os.path.dirname(hoomd.__file__) + '/include';
-        include_path_source = hoomd._hoomd.__hoomd_source_dir__;
-
-        if clang_exec is not None:
-            clang = clang_exec;
-        else:
-            clang = 'clang';
-
-        if fn is not None:
-            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o',fn,'-']
-        else:
-            cmd = [clang, '-O3', '--std=c++11', '-DHOOMD_LLVMJIT_BUILD', '-I', include_path, '-I', include_path_source, '-S', '-emit-llvm','-x','c++', '-o','-','-']
-        p = subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-
-        # pass C++ function to stdin
-        output = p.communicate(cpp_function.encode('utf-8'))
-        llvm_ir = output[0].decode()
-        
-        f = open("llvm_ir_file",'w')
-        f.write(llvm_ir)
-        f.close()
-
-        if p.returncode != 0:
-            hoomd.context.msg.error("Error compiling provided code\n");
-            hoomd.context.msg.error("Command "+' '.join(cmd)+"\n");
-            hoomd.context.msg.error(output[1].decode()+"\n");
-            raise RuntimeError("Error initializing patch energy");
-
-        return llvm_ir
-
-    R''' Disable the patch energy and optionally enable it only for logging
-
-    Args:
-        log (bool): If true, only use patch energy as a log quantity
-
-    '''
-    def disable(self,log=None):
-        hoomd.util.print_status_line();
-
-        if log:
-            # enable only for logging purposes
-            self.mc.cpp_integrator.disablePatchEnergyLogOnly(log)
-            self.log = True
-        else:
-            # disable completely
-            self.mc.cpp_integrator.setPatchEnergy(None);
-            self.log = False
-
-        self.enabled = False
-
-    R''' (Re-)Enable the patch energy
-
-    '''
-    def enable(self):
-        hoomd.util.print_status_line()
-        self.mc.cpp_integrator.setPatchEnergy(self.cpp_evaluator);
+        m = m_expnt
+        n = n_expnt
+        c0 =  -m**2*v0/(8*scaledr_cut**m) - 3*m*v0/(4*scaledr_cut**m) + n**2*v0/(8*scaledr_cut**n) + 3*n*v0/(4*scaledr_cut**n) + v0/scaledr_cut**n - v0/scaledr_cut**m
+        c1 = m**2*v0/(4*scaledr_cut**2*scaledr_cut**m) + m*v0/(scaledr_cut**2*scaledr_cut**m) - n**2*v0/(4*scaledr_cut**2*scaledr_cut**n) - n*v0/(scaledr_cut**2*scaledr_cut**n)
+        c2 = -m**2*v0/(8*scaledr_cut**4*scaledr_cut**m) - m*v0/(4*scaledr_cut**4*scaledr_cut**m) + n**2*v0/(8*scaledr_cut**4*scaledr_cut**n) + n*v0/(4*scaledr_cut**4*scaledr_cut**n)
+        #Note that both m and n exponents need to be even!
+        mtimes = int(m/2)
+        ntimes = int(n/2)
+        code = """
+                        float rsq = dot(r_ij, r_ij);
+                        float sigma  = 0.5*( d_i+d_j)*(1-{}*fabs(d_i-d_j) );
+                        float rcut  = {}*(sigma);
+                        if (rsq <= rcut*rcut)
+                           {{
+                           float v0   = {};
+                           float c0   = {};
+                           float c1   = {};
+                           float c2   = {};
+                           float sigmasq = sigma*sigma;
+                           float rsqinv = sigmasq / rsq;
+                           
+                           float r_repulse = 1;
+                           for (int i = 0; i < {}; i++)
+                           {{
+                                r_repulse *= rsqinv;
+                           }}
+                           
+                           float r_attract = 1;
+                           for (int i = 0; i < {}; i++)
+                           {{
+                                r_attract *= rsqinv;
+                           }}
+                           
+                           
+                           float _rsq = rsq / sigmasq;
+                           return v0*(r_repulse-r_attract)+c0+c1*_rsq+c2*_rsq*_rsq;
+                           }}
+                        else
+                           {{
+                           return 0.0f;
+                           }}
+                      """.format(eps,scaledr_cut,v0/kT,c0/kT,c1/kT,c2/kT,mtimes,ntimes);
+        self.init_checks(code, mc, llvm_ir_file, clang_exec, scaledr_cut)

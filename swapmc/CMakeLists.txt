@@ -18,7 +18,6 @@ set(_${COMPONENT_NAME}_sources
                     PatchEnergyJITCustom.cc 
                     modules_swap.cc
                     modules_sphere_swap.cc
-                    #module-jit-custom.cc
                     )
 
 # we compile a separate package just for the LLVM-interfacing part,
